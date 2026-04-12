@@ -1,0 +1,54 @@
+# Rust
+/target
+**/*.rs.bk
+*.pdb
+Cargo.lock.bak
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# Misc
+.DS_Store
+Thumbs.db
+
+# Local config / secrets
+.env
+.env.local
+*.local
+
+# Ruby legacy (now in legacy-ruby/)
+legacy-ruby/Gemfile.lock
+legacy-ruby/coverage/
+legacy-ruby/pkg/
+legacy-ruby/tmp/
+legacy-ruby/.bundle/
+legacy-ruby/.yardoc
+legacy-ruby/_yardoc/
+legacy-ruby/doc/
+legacy-ruby/.rspec_status
+legacy-ruby/spec/reports/
+legacy-ruby/*.gem
+legacy-ruby/*.rbc
+
+# Coverage
+/coverage
+/lcov.info
+/tarpaulin-report.html
+
+# Cargo-dist
+/dist/cargo-dist
+
+# Local-only planning / explainer notes — never commit
+HLD.md
+NOTES.md
+ROADMAP.local.md
+TODO.local.md
+docs/private/
+
+# local editor / agent config
+.claude/
