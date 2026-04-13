@@ -1,0 +1,87 @@
+[package]
+name          = "leakferret-core"
+version       = { workspace = true }
+edition       = { workspace = true }
+rust-version  = { workspace = true }
+authors       = { workspace = true }
+license       = { workspace = true }
+repository    = { workspace = true }
+description   = "Engine for leakferret: scanning, fixture catalog, verifiers, rewriter, baseline."
+readme        = "README.md"
+keywords      = ["security", "secrets", "scanner", "verification"]
+categories    = ["development-tools"]
+
+[features]
+default = ["verifiers", "reporters"]
+verifiers = []
+reporters = []
+# Disable network code entirely (for static analysis builds, doc-only builds).
+no-net  = []
+
+[dependencies]
+thiserror     = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+serde_with    = { workspace = true }
+regex         = { workspace = true }
+ignore        = { workspace = true }
+walkdir       = { workspace = true }
+once_cell     = { workspace = true }
+parking_lot   = { workspace = true }
+rayon         = { workspace = true }
+indexmap      = { workspace = true }
+memchr        = { workspace = true }
+tracing       = { workspace = true }
+tokio         = { workspace = true }
+reqwest       = { workspace = true }
+futures       = { workspace = true }
+async-trait   = { workspace = true }
+sha2          = { workspace = true }
+hmac          = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex           = { workspace = true }
+base64        = { workspace = true }
+rand          = { workspace = true }
+uuid          = { workspace = true }
+time          = { workspace = true }
+chrono        = { workspace = true }
+dirs          = { workspace = true }
+owo-colors    = { workspace = true }
+
+[dev-dependencies]
+insta             = { workspace = true }
+pretty_assertions = { workspace = true }
+mockito           = { workspace = true }
+rstest            = { workspace = true }
+tempfile          = { workspace = true }
+proptest          = { workspace = true }
+tokio             = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[lints.clippy]
+all      = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery  = { level = "warn", priority = -1 }
+# Allow a few pedantic lints that are too noisy in practice.
+module_name_repetitions = "allow"
+must_use_candidate      = "allow"
+missing_errors_doc      = "allow"
+missing_panics_doc      = "allow"
+similar_names           = "allow"
+needless_pass_by_value  = "allow"
+# Builder/accessor and ergonomics lints we deliberately don't enforce.
+return_self_not_must_use = "allow"
+struct_field_names       = "allow"
+# Module-header prose reads better as one paragraph than reflowed to fit.
+too_long_first_doc_paragraph = "allow"
+# Nursery lints that are noisy or false-positive-prone here: const-fn
+# suggestions churn the API, drop-tightening fights parking_lot guards,
+# and the if-let/pub-crate rewrites read worse than the originals.
+missing_const_for_fn        = "allow"
+significant_drop_tightening = "allow"
+option_if_let_else          = "allow"
+redundant_pub_crate         = "allow"
