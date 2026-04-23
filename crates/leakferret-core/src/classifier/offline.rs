@@ -1,0 +1,279 @@
+//! Pure-heuristic classifier. Decides REAL / FIXTURE / UNKNOWN based
+//! on:
+//!
+//!   1. Catalog hit. Three sub-cases driven by [`CatalogVerdict`]:
+//!      * Fixture        → `Verdict::Fixture`, confidence 1.0.
+//!      * `KnownLeaked`    → `Verdict::Real`, severity High, confidence 1.0.
+//!      * Honeytoken     → `Verdict::Real`, severity **Critical** (mutated
+//!        even if the pattern said something lower), confidence 1.0,
+//!        alert-grade reason string.
+//!   2. Verifier outcome (deterministic REAL when verified).
+//!   3. Path hints (`spec/`, `fixtures/`, `.env.example`).
+//!   4. Obvious dummy markers in the secret value (`EXAMPLE`, `xxxx`).
+//!   5. Pattern severity in an app path (`app/`, `lib/`, `src/`).
+
+use crate::catalog::{Catalog, CatalogVerdict};
+use crate::finding::{Finding, Severity, Verdict};
+use crate::patterns::{looks_like_app_path, looks_like_fixture_path};
+use crate::verifier::VerificationOutcome;
+
+use super::Classifier;
+
+/// Offline classifier. Holds a reference to a catalog so it can
+/// resolve fixture hits without re-reading the file.
+#[derive(Debug)]
+pub struct OfflineClassifier<'a> {
+    catalog: &'a Catalog,
+}
+
+impl<'a> OfflineClassifier<'a> {
+    pub fn new(catalog: &'a Catalog) -> Self {
+        Self { catalog }
+    }
+}
+
+const DUMMY_MARKERS: &[&str] = &[
+    "EXAMPLE",
+    "example",
+    "xxxx",
+    "XXXX",
+    "test_xxx",
+    "placeholder",
+    "REDACTED",
+    "CHANGEME",
+    "your-key-here",
+    "<your",
+    "TODO",
+];
+
+fn obvious_dummy(value: &str) -> bool {
+    DUMMY_MARKERS.iter().any(|m| value.contains(m))
+}
+
+impl Classifier for OfflineClassifier<'_> {
+    fn classify(&self, findings: &mut [Finding]) {
+        for f in findings {
+            // 1) Catalog wins. Three deterministic sub-verdicts.
+            if let Some((catalog_verdict, id)) = self.catalog.lookup(&f.r#match) {
+                match catalog_verdict {
+                    CatalogVerdict::Fixture => {
+                        f.verdict = Verdict::Fixture;
+                        f.reason = Some(format!("Catalog hit: {id}"));
+                        f.confidence = Some(1.0);
+                    }
+                    CatalogVerdict::KnownLeaked => {
+                        f.verdict = Verdict::Real;
+                        f.severity = Severity::High;
+                        f.reason = Some(format!("Catalog hit: known historical leak ({id})"));
+                        f.confidence = Some(1.0);
+                    }
+                    CatalogVerdict::Honeytoken => {
+                        f.verdict = Verdict::Real;
+                        // Mutate severity even if the pattern said lower —
+                        // honeytoken trips are always alert-grade.
+                        f.severity = Severity::Critical;
+                        f.reason = Some(format!(
+                            "HONEYTOKEN TRIPPED: {id}. This match indicates unauthorized access to source containing a planted canary."
+                        ));
+                        f.confidence = Some(1.0);
+                    }
+                }
+                continue;
+            }
+
+            // 2) Verifier outcome trumps heuristic.
+            match &f.verification {
+                Some(VerificationOutcome::Verified { provider, .. }) => {
+                    f.verdict = Verdict::Real;
+                    f.reason = Some(format!("Verified live with {provider}"));
+                    f.confidence = Some(1.0);
+                    continue;
+                }
+                Some(VerificationOutcome::Invalid { provider, .. }) => {
+                    f.verdict = Verdict::Fixture;
+                    f.reason = Some(format!("{provider} rejected — key not currently active"));
+                    f.confidence = Some(0.85);
+                    continue;
+                }
+                _ => {}
+            }
+
+            let path_str = f.path.to_string_lossy();
+
+            // 3) Path hints.
+            if looks_like_fixture_path(&path_str) {
+                f.verdict = Verdict::Fixture;
+                f.reason = Some(format!(
+                    "Path matches fixture/test/example heuristic ({path_str})"
+                ));
+                f.confidence = Some(0.7);
+                continue;
+            }
+
+            // 4) Obvious dummies.
+            if obvious_dummy(&f.r#match) {
+                f.verdict = Verdict::Fixture;
+                f.reason = Some(
+                    "Matched value contains a documented dummy marker (EXAMPLE / xxxx / placeholder)"
+                        .into(),
+                );
+                f.confidence = Some(0.9);
+                continue;
+            }
+
+            // 5) High-severity in app path.
+            if f.severity.is_high_or_above() && looks_like_app_path(&path_str) {
+                f.verdict = Verdict::Real;
+                f.reason = Some(format!(
+                    "High-severity pattern in application path ({path_str})"
+                ));
+                f.confidence = Some(0.65);
+                continue;
+            }
+
+            f.verdict = Verdict::Unknown;
+            f.reason = Some(
+                "Offline heuristics inconclusive; run with verifier or host LLM for higher precision."
+                    .into(),
+            );
+            f.confidence = Some(0.3);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::catalog::{CatalogEntry, CatalogFile, CatalogIndex, CatalogVerdict, MatchStrategy};
+    use crate::finding::Severity;
+    use std::path::PathBuf;
+
+    fn finding(path: &str, value: &str, sev: Severity) -> Finding {
+        Finding {
+            path: PathBuf::from(path),
+            line: 1,
+            column: 1,
+            r#match: value.into(),
+            pattern: "x".into(),
+            severity: sev,
+            context: vec![],
+            verdict: Verdict::Unknown,
+            reason: None,
+            confidence: None,
+            verification: None,
+            fingerprint: None,
+            replacement: None,
+            git_commit: None,
+            git_commit_subject: None,
+        }
+    }
+
+    /// Construct an in-memory catalog containing a single entry with
+    /// the requested verdict. Used by the catalog-branch tests below.
+    fn catalog_with(value: &str, verdict: CatalogVerdict, id: &str) -> Catalog {
+        let entry = CatalogEntry {
+            id: id.into(),
+            kind: "test".into(),
+            matcher: MatchStrategy::Exact {
+                value: value.into(),
+            },
+            source: "test".into(),
+            source_checked_at: None,
+            rationale: None,
+            trust: crate::catalog::TrustLevel::default(),
+            verdict,
+        };
+        let entries = vec![entry];
+        let index = CatalogIndex::from_entries(&entries).expect("index");
+        let file = CatalogFile {
+            schema_version: 1,
+            catalog_version: "test".into(),
+            license: "CC0-1.0".into(),
+            signature: None,
+            signing_key_id: None,
+            entries,
+        };
+        Catalog { file, index }
+    }
+
+    #[test]
+    fn marks_fixture_path_as_fixture() {
+        let catalog = Catalog::empty();
+        let mut fs = vec![finding(
+            "spec/fixtures/keys.rb",
+            "AKIAREAL12345BUTSPEC",
+            Severity::High,
+        )];
+        OfflineClassifier::new(&catalog).classify(&mut fs);
+        assert_eq!(fs[0].verdict, Verdict::Fixture);
+    }
+
+    #[test]
+    fn marks_high_sev_in_app_path_as_real() {
+        let catalog = Catalog::empty();
+        let mut fs = vec![finding(
+            "app/config.rb",
+            "AKIAREAL12345CONFIG",
+            Severity::High,
+        )];
+        OfflineClassifier::new(&catalog).classify(&mut fs);
+        assert_eq!(fs[0].verdict, Verdict::Real);
+    }
+
+    #[test]
+    fn dummy_marker_overrides_to_fixture() {
+        let catalog = Catalog::empty();
+        let mut fs = vec![finding(
+            "app/config.rb",
+            "AKIAIOSFODNN7EXAMPLE",
+            Severity::High,
+        )];
+        OfflineClassifier::new(&catalog).classify(&mut fs);
+        assert_eq!(fs[0].verdict, Verdict::Fixture);
+    }
+
+    #[test]
+    fn known_leaked_catalog_hit_is_real_high() {
+        let value = "AKIAREALCANARY000001";
+        let catalog = catalog_with(value, CatalogVerdict::KnownLeaked, "ht.aws.example-leak");
+        let mut fs = vec![finding("app/config.rb", value, Severity::Low)];
+        OfflineClassifier::new(&catalog).classify(&mut fs);
+        assert_eq!(fs[0].verdict, Verdict::Real);
+        assert_eq!(fs[0].severity, Severity::High);
+        assert!(fs[0]
+            .reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("historical leak"));
+    }
+
+    #[test]
+    fn honeytoken_catalog_hit_is_critical_even_when_pattern_was_low() {
+        let value = "AKIAHONEYTOKEN0000001";
+        let catalog = catalog_with(value, CatalogVerdict::Honeytoken, "ht.aws.acme.001");
+        // Pattern's natural severity is Low — the classifier must raise it.
+        let mut fs = vec![finding("app/config.rb", value, Severity::Low)];
+        OfflineClassifier::new(&catalog).classify(&mut fs);
+        assert_eq!(fs[0].verdict, Verdict::Real);
+        assert_eq!(
+            fs[0].severity,
+            Severity::Critical,
+            "honeytoken must mutate severity to Critical regardless of pattern"
+        );
+        let reason = fs[0].reason.as_deref().unwrap_or_default();
+        assert!(
+            reason.starts_with("HONEYTOKEN TRIPPED"),
+            "reason was {reason}"
+        );
+        assert!(reason.contains("ht.aws.acme.001"));
+    }
+
+    #[test]
+    fn honeytoken_critical_when_pattern_was_unknown() {
+        let value = "AKIAHONEYTOKEN0000002";
+        let catalog = catalog_with(value, CatalogVerdict::Honeytoken, "ht.aws.acme.002");
+        let mut fs = vec![finding("app/config.rb", value, Severity::Unknown)];
+        OfflineClassifier::new(&catalog).classify(&mut fs);
+        assert_eq!(fs[0].severity, Severity::Critical);
+    }
+}
