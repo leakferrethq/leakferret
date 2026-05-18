@@ -1,0 +1,22 @@
+[package]
+name          = "leakferret-mcp"
+version       = { workspace = true }
+edition       = { workspace = true }
+rust-version  = { workspace = true }
+authors       = { workspace = true }
+license       = { workspace = true }
+repository    = { workspace = true }
+description   = "MCP (Model Context Protocol) server for leakferret — exposes scan, classify, propose_rewrite, verify, baseline_diff over JSON-RPC stdio."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+leakferret-core = { path = "../leakferret-core", version = "0.1.0" }
+
+anyhow             = { workspace = true }
+serde              = { workspace = true }
+serde_json         = { workspace = true }
+tokio              = { workspace = true }
+tracing            = { workspace = true }
+async-trait        = { workspace = true }
