@@ -1,0 +1,11 @@
+- id: leakferret
+  name: leakferret (block hardcoded secrets)
+  description: Scans staged files for hardcoded secrets. Fails on REAL findings.
+  entry: leakferret verify
+  language: ruby
+  language_version: '3.3'
+  pass_filenames: true
+  args: ['--format', 'pretty', '--only']
+  types_or: [text]
+  # Only scan staged files, not the whole repo. pre-commit passes the
+  # paths via $@, which the wrapper script forwards to `--only`.

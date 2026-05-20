@@ -1,0 +1,98 @@
+name: 'leakferret'
+description: 'Context-aware secret detection. Comments on PRs with redacted findings; uploads SARIF to GitHub Code Scanning.'
+author: 'Maria Khan'
+branding:
+  icon: 'shield'
+  color: 'red'
+
+inputs:
+  path:
+    description: 'Directory to scan'
+    required: false
+    default: '.'
+  format:
+    description: 'Output format: pretty | json | sarif'
+    required: false
+    default: 'sarif'
+  upload-sarif:
+    description: 'Upload SARIF to GitHub Code Scanning (requires permissions: security-events: write)'
+    required: false
+    default: 'true'
+  fail-on:
+    description: 'Exit non-zero on findings of this severity or higher: critical | high | medium | low | any | never'
+    required: false
+    default: 'high'
+  exclude:
+    description: 'Newline-separated globs to exclude (in addition to .gitignore)'
+    required: false
+    default: ''
+
+outputs:
+  sarif-file:
+    description: 'Path to the generated SARIF file'
+    value: ${{ steps.scan.outputs.sarif-file }}
+  findings-count:
+    description: 'Total candidate count'
+    value: ${{ steps.scan.outputs.findings-count }}
+  real-count:
+    description: 'REAL-classified count'
+    value: ${{ steps.scan.outputs.real-count }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.3'
+
+    - name: Install leakferret
+      shell: bash
+      run: gem install leakferret
+
+    - name: Run scan
+      id: scan
+      shell: bash
+      run: |
+        EXCLUDE_ARGS=""
+        if [ -n "${{ inputs.exclude }}" ]; then
+          while IFS= read -r glob; do
+            [ -z "$glob" ] && continue
+            EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude $glob"
+          done <<< "${{ inputs.exclude }}"
+        fi
+
+        OUTPUT_FILE="leakferret.sarif"
+        leakferret verify "${{ inputs.path }}" --format ${{ inputs.format }} $EXCLUDE_ARGS > "$OUTPUT_FILE" || true
+
+        echo "sarif-file=$OUTPUT_FILE" >> $GITHUB_OUTPUT
+
+        # Summarise — note we can't classify with the host LM here (no IDE),
+        # so the offline heuristic classifier carries the verdict.
+        REAL=$(jq '[.runs[0].results[] | select(.level == "error")] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+        TOTAL=$(jq '.runs[0].results | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+        echo "findings-count=$TOTAL" >> $GITHUB_OUTPUT
+        echo "real-count=$REAL" >> $GITHUB_OUTPUT
+
+        echo "::notice::leakferret found $TOTAL candidate(s), $REAL classified REAL"
+
+    - name: Upload SARIF to Code Scanning
+      if: inputs.upload-sarif == 'true' && inputs.format == 'sarif'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ steps.scan.outputs.sarif-file }}
+        category: leakferret
+
+    - name: Fail on findings
+      shell: bash
+      run: |
+        REAL=${{ steps.scan.outputs.real-count }}
+        case "${{ inputs.fail-on }}" in
+          never) exit 0 ;;
+          any)
+            [ "${{ steps.scan.outputs.findings-count }}" = "0" ] || exit 1
+            ;;
+          *)
+            [ "$REAL" = "0" ] || exit 1
+            ;;
+        esac

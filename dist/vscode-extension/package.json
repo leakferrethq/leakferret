@@ -1,0 +1,72 @@
+{
+  "name": "leakferret",
+  "displayName": "leakferret",
+  "description": "Context-aware secret detection and one-click env-var rewrite. Powered by your own Copilot / Claude model.",
+  "version": "0.0.1",
+  "publisher": "leakferrethq",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Linters", "Other"],
+  "keywords": ["secrets", "security", "secret scanner", "linter", "env"],
+  "activationEvents": [
+    "onLanguage:ruby",
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:python",
+    "onLanguage:go",
+    "onLanguage:yaml",
+    "onLanguage:json",
+    "onLanguage:dotenv"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "leakferret.scanWorkspace",
+        "title": "leakferret: Scan workspace"
+      },
+      {
+        "command": "leakferret.scanFile",
+        "title": "leakferret: Scan current file"
+      },
+      {
+        "command": "leakferret.classifyDiagnostic",
+        "title": "leakferret: Classify (uses LM)"
+      }
+    ],
+    "configuration": {
+      "title": "leakferret",
+      "properties": {
+        "leakferret.gemPath": {
+          "type": "string",
+          "default": "leakferret",
+          "description": "Path to the leakferret CLI."
+        },
+        "leakferret.classifyOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run the LM classifier on save (uses host Copilot / Claude model)."
+        },
+        "leakferret.modelFamily": {
+          "type": "string",
+          "default": "gpt-4o",
+          "enum": ["gpt-4o", "claude-3-5-sonnet", "claude-3-5-haiku"],
+          "description": "Preferred LM family when multiple are available."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}
