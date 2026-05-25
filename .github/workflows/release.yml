@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            bin: leakferret
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            bin: leakferret
+            cross: true
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            bin: leakferret
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            bin: leakferret
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            bin: leakferret.exe
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+            bin: leakferret.exe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cross (for aarch64-linux)
+        if: matrix.cross
+        run: cargo install cross --git https://github.com/cross-rs/cross --locked
+
+      - name: Build (cargo)
+        if: ${{ ! matrix.cross }}
+        run: cargo build --release --target ${{ matrix.target }} -p leakferret-cli
+
+      - name: Build (cross)
+        if: matrix.cross
+        run: cross build --release --target ${{ matrix.target }} -p leakferret-cli
+
+      - name: Stage artefact
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          stage="leakferret-${version}-${{ matrix.target }}"
+          mkdir -p "dist/${stage}"
+          cp "target/${{ matrix.target }}/release/${{ matrix.bin }}" "dist/${stage}/"
+          cp README.md LICENSE.txt "dist/${stage}/"
+          (cd dist && tar -czf "${stage}.tar.gz" "${stage}")
+          (cd dist && shasum -a 256 "${stage}.tar.gz" > "${stage}.tar.gz.sha256")
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: dist/leakferret-*
+
+  publish:
+    name: publish github release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Flatten
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find dist -type f \( -name '*.tar.gz' -o -name '*.sha256' \) -exec cp {} release/ \;
+          ls -la release/
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          gh release create "v${version}" \
+            release/*.tar.gz release/*.sha256 \
+            --title "leakferret v${version}" \
+            --notes-file CHANGELOG.md \
+            --draft
