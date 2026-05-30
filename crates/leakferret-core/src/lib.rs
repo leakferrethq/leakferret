@@ -61,7 +61,7 @@ pub use crate::{
     patterns::{Pattern, PatternId, PatternRegistry},
     reporter::{Reporter, ReporterFormat},
     rewriter::{Language, Replacement, Rewriter},
-    scanner::{GitHistoryScanner, Scanner},
+    scanner::{GitHistoryScanner, ScanProgress, Scanner},
     verifier::{VerificationOutcome, Verifier, VerifierRegistry},
 };
 

@@ -17,6 +17,7 @@ pub use git_history::GitHistoryScanner;
 pub use walker::{walk, WalkConfig};
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
@@ -24,6 +25,18 @@ use crate::config::EngineConfig;
 use crate::finding::{Finding, Verdict};
 use crate::patterns::PatternRegistry;
 use crate::Result;
+
+/// Live counters for an in-flight scan, shared between the scanner and a
+/// caller-supplied progress renderer (e.g. a CLI spinner). The fields are
+/// read and written with `Relaxed` ordering — they drive a progress
+/// display, not any correctness-bearing logic.
+#[derive(Debug, Default)]
+pub struct ScanProgress {
+    /// Total files to scan. Zero until the walk completes, then set once.
+    pub total: AtomicUsize,
+    /// Files scanned so far.
+    pub scanned: AtomicUsize,
+}
 
 /// Orchestrates walking + scanning. Wraps a [`PatternRegistry`] and
 /// an [`EngineConfig`].
@@ -43,6 +56,13 @@ impl<'a> Scanner<'a> {
     /// returned vector is not stable across runs but findings within
     /// the same file are returned in document order.
     pub fn scan(&self) -> Result<Vec<Finding>> {
+        self.scan_reporting(None)
+    }
+
+    /// Like [`scan`](Self::scan), but bumps `progress` as the walk
+    /// completes and each file is scanned, so a caller can render a
+    /// live progress indicator. Pass `None` for the plain behaviour.
+    pub fn scan_reporting(&self, progress: Option<&ScanProgress>) -> Result<Vec<Finding>> {
         let walk_cfg = WalkConfig {
             root: self.config.root.clone(),
             extra_excludes: self.config.extra_excludes.clone(),
@@ -50,10 +70,19 @@ impl<'a> Scanner<'a> {
             only_paths: self.config.only_paths.clone(),
         };
         let files = walk(&walk_cfg)?;
+        if let Some(p) = progress {
+            p.total.store(files.len(), Ordering::Relaxed);
+        }
 
         let findings: Vec<Vec<Finding>> = files
             .into_par_iter()
-            .map(|path| self.scan_file(&path))
+            .map(|path| {
+                let found = self.scan_file(&path);
+                if let Some(p) = progress {
+                    p.scanned.fetch_add(1, Ordering::Relaxed);
+                }
+                found
+            })
             .collect();
 
         let mut flat: Vec<Finding> = findings.into_iter().flatten().collect();
