@@ -60,16 +60,10 @@ impl Engine {
     ///
     /// Catalogs loaded from the refresh directory must verify against
     /// the embedded public key when one is configured (see
-    /// [`crate::catalog::EMBEDDED_PUBLIC_KEY`]).
-    ///
-    /// # TODO
-    ///
-    /// The bundled snapshot will eventually be `include_str!`'d from
-    /// `leakferret-catalog/catalog/<latest>.json` at build time, so
-    /// step 3 always returns *something*. Until that wiring lands, this
-    /// returns [`Catalog::empty`] for step 3 — fine for development,
-    /// since the catalog is an optimisation layer, not a correctness
-    /// requirement.
+    /// [`crate::catalog::EMBEDDED_PUBLIC_KEY`]). The bundled snapshot is
+    /// `include_str!`'d into the binary at build time — a vendored copy of
+    /// the `leakferret-catalog` repo (CC-BY-SA-4.0) — and is trusted as-is,
+    /// since tampering with it means tampering with the binary itself.
     pub fn load_catalog_chain(cfg: &EngineConfig) -> Result<Catalog> {
         let embedded = embedded_verifying_key()?;
 
@@ -90,9 +84,15 @@ impl Engine {
             return Catalog::load(custom, None);
         }
 
-        // 3. Bundled snapshot — TODO: replace with include_str! once the
-        //    catalog repo snapshot is wired into the build.
-        Ok(Catalog::empty())
+        // 3. Bundled snapshot, compiled into the binary. No signature
+        //    check — it is part of the trusted binary. Fall back to an
+        //    empty catalog only if the vendored copy fails to parse.
+        Ok(
+            Catalog::parse(include_str!("../catalog/snapshot.json"), None).unwrap_or_else(|err| {
+                tracing::warn!("bundled catalog failed to parse ({err}); using empty catalog");
+                Catalog::empty()
+            }),
+        )
     }
 
     /// Build with an explicit catalog (e.g. signed snapshot loaded by

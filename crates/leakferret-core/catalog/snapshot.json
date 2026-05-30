@@ -1,0 +1,212 @@
+{
+  "schema_version": 1,
+  "catalog_version": "2026.05.27",
+  "license": "CC-BY-SA-4.0",
+  "signature": null,
+  "signing_key_id": null,
+  "entries": [
+    {
+      "id": "stripe.test.docs.4eC39",
+      "kind": "stripe_test_key",
+      "match": { "strategy": "exact", "value": "sk_test_4eC39HqLyjWDarjtT1zdp7dc" },
+      "source": "https://stripe.com/docs/testing",
+      "source_checked_at": "2026-04-01",
+      "rationale": "Stripe's canonical published test secret key.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "stripe.test.docs.pk-publishable",
+      "kind": "stripe_test_publishable",
+      "match": { "strategy": "exact", "value": "pk_test_TYooMQauvdEDq54NiTphI7jx" },
+      "source": "https://stripe.com/docs/testing",
+      "source_checked_at": "2026-04-01",
+      "rationale": "Stripe's canonical published test publishable key.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "aws.iam.docs.AKIAIOSFODNN7EXAMPLE",
+      "kind": "aws_access_key",
+      "match": { "strategy": "exact", "value": "AKIAIOSFODNN7EXAMPLE" },
+      "source": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html",
+      "source_checked_at": "2026-04-01",
+      "rationale": "AWS docs canary access key ID used in every IAM example.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "aws.iam.docs.wJalrXUt-secret",
+      "kind": "aws_secret_key",
+      "match": { "strategy": "exact", "value": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" },
+      "source": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html",
+      "source_checked_at": "2026-04-01",
+      "rationale": "AWS docs canary secret access key.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "jwt.io.example.hs256",
+      "kind": "jwt",
+      "match": {
+        "strategy": "exact",
+        "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+      },
+      "source": "https://jwt.io",
+      "source_checked_at": "2026-04-01",
+      "rationale": "jwt.io's canonical example HS256 token.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "google.api.docs.AIzaSyB-PLACEHOLDER",
+      "kind": "google_api_key",
+      "match": { "strategy": "regex", "pattern": "^AIza[0-9A-Za-z_-]{0,5}PLACEHOLDER[0-9A-Za-z_-]+$" },
+      "source": "https://cloud.google.com/docs/authentication/api-keys",
+      "source_checked_at": "2026-04-01",
+      "rationale": "Generic Google API key placeholder pattern from docs.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "openai.docs.placeholder.sk",
+      "kind": "openai_key",
+      "match": { "strategy": "regex", "pattern": "^sk-(?:proj-)?[xX]{20,}$" },
+      "source": "https://platform.openai.com/docs/api-reference/authentication",
+      "source_checked_at": "2026-04-01",
+      "rationale": "OpenAI documentation uses sk-xxxxx as a placeholder pattern.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "anthropic.docs.placeholder.sk-ant",
+      "kind": "anthropic_key",
+      "match": { "strategy": "regex", "pattern": "^sk-ant-(?:api03-)?[xX]{20,}$" },
+      "source": "https://docs.anthropic.com/en/api/authentication",
+      "source_checked_at": "2026-04-01",
+      "rationale": "Anthropic docs placeholder pattern for keys.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "github.docs.placeholder.ghp_xxx",
+      "kind": "github_token",
+      "match": { "strategy": "regex", "pattern": "^ghp_[xX]{36,}$" },
+      "source": "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens",
+      "source_checked_at": "2026-04-01",
+      "rationale": "GitHub docs placeholder pattern.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "rfc.7517.jwk.example.kid-1",
+      "kind": "rsa_private_key",
+      "match": { "strategy": "exact", "value": "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA7d6T==" },
+      "source": "https://datatracker.ietf.org/doc/html/rfc7517",
+      "source_checked_at": "2026-04-01",
+      "rationale": "RFC 7517 JWK example key prefix.",
+      "trust": "rfc_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "postgres.docs.example.user-pass",
+      "kind": "postgres_url",
+      "match": { "strategy": "regex", "pattern": "^postgres(?:ql)?://user(?:name)?:(?:password|pass|secret)@(?:localhost|example\\.com|hostname)" },
+      "source": "https://www.postgresql.org/docs/current/libpq-connect.html",
+      "source_checked_at": "2026-04-01",
+      "rationale": "Postgres docs example URI patterns.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "mongo.docs.example.user-pass",
+      "kind": "mongodb_url",
+      "match": { "strategy": "regex", "pattern": "^mongodb(?:\\+srv)?://user(?:name)?:(?:password|pass|secret)@(?:localhost|example\\.com|host(?:name)?)" },
+      "source": "https://www.mongodb.com/docs/manual/reference/connection-string/",
+      "source_checked_at": "2026-04-01",
+      "rationale": "MongoDB connection-string examples.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "twilio.docs.test-sid.SK00000",
+      "kind": "twilio_key",
+      "match": { "strategy": "regex", "pattern": "^SK0{32}$" },
+      "source": "https://www.twilio.com/docs/iam/test-credentials",
+      "source_checked_at": "2026-04-01",
+      "rationale": "Twilio test SID pattern (all zeros after SK).",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "slack.docs.example.xoxb-fake",
+      "kind": "slack_token",
+      "match": { "strategy": "regex", "pattern": "^xox[abprs]-(?:fake|example|test|placeholder|YOUR)[0-9A-Z_-]+$" },
+      "source": "https://api.slack.com/authentication/token-types",
+      "source_checked_at": "2026-04-01",
+      "rationale": "Slack docs use 'YOUR_TOKEN' / 'fake' placeholders.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "sendgrid.docs.placeholder.SG",
+      "kind": "sendgrid_key",
+      "match": { "strategy": "regex", "pattern": "^SG\\.(?:[xX_-]{22}|YOUR_[A-Z0-9_-]+)\\.[xX_-]{22,}$" },
+      "source": "https://docs.sendgrid.com/api-reference/how-to-use-the-sendgrid-v3-api/authentication",
+      "source_checked_at": "2026-04-01",
+      "rationale": "SendGrid docs placeholder pattern.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "azure.docs.example.connstr",
+      "kind": "azure_storage",
+      "match": { "strategy": "regex", "pattern": "DefaultEndpointsProtocol=https;AccountName=(?:youraccount|example|sample|MYACCOUNT);" },
+      "source": "https://learn.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string",
+      "source_checked_at": "2026-04-01",
+      "rationale": "Azure docs example connection-string accounts.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "gcp.docs.service-account.example",
+      "kind": "gcp_service_account",
+      "match": { "strategy": "regex", "pattern": "\"private_key_id\"\\s*:\\s*\"(?:[0]{40}|EXAMPLE[a-f0-9]+)\"" },
+      "source": "https://cloud.google.com/iam/docs/service-account-creds",
+      "source_checked_at": "2026-04-01",
+      "rationale": "GCP service account JSON example with placeholder private_key_id.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "openssh.testkey.devnull-canary",
+      "kind": "pem_private_key",
+      "match": { "strategy": "exact_hash", "sha256": "44e7e2b8b46f12daf83b2a3ec6f3a5e4c7d2c6f9a04e8b9c2d1e0f3a5b8c7d9e" },
+      "source": "https://github.com/openssh/openssh-portable/blob/master/regress/dsa_ssh2.prv",
+      "source_checked_at": "2026-04-01",
+      "rationale": "OpenSSH test key shipped in the OpenSSH source tree.",
+      "trust": "community_verified",
+      "verdict": "FIXTURE"
+    },
+    {
+      "id": "honeytoken.example.canary",
+      "kind": "honeytoken",
+      "match": { "strategy": "exact", "value": "ht_canary_RuFLO_2026" },
+      "source": "internal",
+      "source_checked_at": "2026-05-27",
+      "rationale": "Example honeytoken — replace with org-specific tokens.",
+      "trust": "community_verified",
+      "verdict": "HONEYTOKEN"
+    },
+    {
+      "id": "redis.docs.example.user-pass",
+      "kind": "redis_url_auth",
+      "match": { "strategy": "regex", "pattern": "^rediss?://(?:default|user):(?:password|pass|secret|REPLACE_ME)@(?:localhost|example\\.com|redis-server)" },
+      "source": "https://redis.io/docs/connect/",
+      "source_checked_at": "2026-04-01",
+      "rationale": "Redis docs example connection strings.",
+      "trust": "vendor_published",
+      "verdict": "FIXTURE"
+    }
+  ]
+}
