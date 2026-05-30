@@ -1,7 +1,0 @@
-[toolchain]
-# GNU triple on Windows so the build doesn't require MSVC `link.exe`.
-# Linux/macOS CI uses the default native triple.
-channel    = "1.95.0"
-components = ["rustfmt", "clippy"]
-targets    = ["x86_64-pc-windows-gnu"]
-profile    = "minimal"

@@ -52,3 +52,8 @@ docs/private/
 
 # local editor / agent config
 .claude/
+
+# Local toolchain pin (GNU-on-Windows dev convenience). Committing it forces
+# one channel+target on CI and contributors and breaks cross-target builds;
+# CI and the MSRV job select their own toolchains.
+rust-toolchain.toml
