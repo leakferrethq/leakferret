@@ -77,11 +77,6 @@ pub const DEFAULT_INCLUDE_EXT: &[&str] = &[
     "containerfile",
 ];
 
-/// Directories always excluded from the walk. These hold agent/tool
-/// state — notably Claude Code worktrees under `.claude/`, which are
-/// full repo checkouts — so scanning them would duplicate the project.
-const DEFAULT_EXCLUDE_DIRS: &[&str] = &[".claude/", "**/.claude/"];
-
 /// Top-level walker configuration. Carried by [`crate::Scanner`].
 #[derive(Debug, Clone)]
 pub struct WalkConfig {
@@ -100,16 +95,6 @@ pub fn walk(cfg: &WalkConfig) -> Result<Vec<PathBuf>> {
     let include_ext: HashSet<&str> = DEFAULT_INCLUDE_EXT.iter().copied().collect();
 
     let mut overrides = OverrideBuilder::new(&cfg.root);
-    // Built-in excludes for agent/tool state. `.claude/` holds Claude
-    // Code worktrees — full checkouts of the repo — so scanning it means
-    // scanning the project N times over. Pruning the directory is both a
-    // correctness fix (no duplicate findings) and the dominant perf win
-    // on machines that use agent worktrees.
-    for pat in DEFAULT_EXCLUDE_DIRS {
-        overrides
-            .add(&format!("!{pat}"))
-            .map_err(|e| crate::Error::Other(format!("default exclude {pat:?}: {e}")))?;
-    }
     for pat in &cfg.extra_excludes {
         // `!` prefix in `ignore::overrides` *exclude*s a glob.
         overrides
@@ -129,6 +114,11 @@ pub fn walk(cfg: &WalkConfig) -> Result<Vec<PathBuf>> {
         .git_ignore(true)
         .overrides(overrides)
         .follow_links(false)
+        // Prune `.claude/worktrees/` (Claude Code keeps full repo checkouts
+        // there). filter_entry stops the walk from descending into them, so
+        // the project isn't scanned N times over. The rest of `.claude/` is
+        // still walked — config there can hold real MCP tokens.
+        .filter_entry(|e| !is_claude_worktrees(e.path()))
         .build();
 
     let mut out = Vec::with_capacity(1024);
@@ -176,6 +166,18 @@ pub fn walk(cfg: &WalkConfig) -> Result<Vec<PathBuf>> {
 
 fn exceeds_size(path: &std::path::Path, limit: u64) -> bool {
     std::fs::metadata(path).is_ok_and(|m| m.len() > limit)
+}
+
+/// True if `path` is a `.claude/worktrees` directory. Claude Code keeps
+/// full repo checkouts there, so pruning it avoids scanning the project
+/// N times over. The rest of `.claude/` is still scanned, since config
+/// like `.claude/settings.json` / `.mcp.json` can hold real tokens.
+fn is_claude_worktrees(path: &std::path::Path) -> bool {
+    path.file_name().is_some_and(|n| n == "worktrees")
+        && path
+            .parent()
+            .and_then(std::path::Path::file_name)
+            .is_some_and(|n| n == ".claude")
 }
 
 #[cfg(test)]
@@ -231,9 +233,13 @@ mod tests {
     }
 
     #[test]
-    fn excludes_dot_claude_worktrees_by_default() {
+    fn excludes_claude_worktrees_but_still_scans_claude_config() {
         let tmp = TempDir::new().unwrap();
         std::fs::write(tmp.path().join("real.rb"), "x").unwrap();
+        // `.claude/` config can hold real MCP tokens — must still be scanned.
+        std::fs::create_dir_all(tmp.path().join(".claude")).unwrap();
+        std::fs::write(tmp.path().join(".claude/mcp.json"), "{}").unwrap();
+        // `.claude/worktrees/` are full repo copies — must be skipped.
         let wt = tmp.path().join(".claude/worktrees/copy");
         std::fs::create_dir_all(&wt).unwrap();
         std::fs::write(wt.join("dup.rb"), "x").unwrap();
@@ -244,7 +250,13 @@ mod tests {
             only_paths: None,
         };
         let files = walk(&cfg).unwrap();
-        assert_eq!(files.len(), 1, "the .claude worktree copy must be skipped");
-        assert!(files[0].ends_with("real.rb"));
+        assert_eq!(
+            files.len(),
+            2,
+            "real.rb and .claude/mcp.json, not the worktree copy"
+        );
+        assert!(files.iter().any(|f| f.ends_with("real.rb")));
+        assert!(files.iter().any(|f| f.ends_with("mcp.json")));
+        assert!(!files.iter().any(|f| f.ends_with("dup.rb")));
     }
 }
