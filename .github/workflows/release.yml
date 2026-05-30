@@ -66,7 +66,7 @@ jobs:
           (cd dist && tar -czf "${stage}.tar.gz" "${stage}")
           (cd dist && shasum -a 256 "${stage}.tar.gz" > "${stage}.tar.gz.sha256")
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
           path: dist/leakferret-*
