@@ -53,6 +53,10 @@ docs/private/
 # local editor / agent config
 .claude/
 
+# Brand asset render tooling (node deps + scratch); the rendered assets under
+# brand/ are committed, the renderer used to produce them is not.
+brand/.render/
+
 # Local toolchain pin (GNU-on-Windows dev convenience). Committing it forces
 # one channel+target on CI and contributors and breaks cross-target builds;
 # CI and the MSRV job select their own toolchains.
