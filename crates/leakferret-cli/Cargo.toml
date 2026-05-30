@@ -33,6 +33,13 @@ similar            = { workspace = true }
 reqwest            = { workspace = true }
 base64             = { workspace = true }
 ed25519-dalek      = { workspace = true }
+# Only pulled in by the `vendored-openssl` feature, which the release
+# workflow enables for cross-compiled targets (e.g. aarch64-linux) so
+# OpenSSL is built from source rather than linked from the (absent) system.
+openssl            = { version = "0.10", optional = true }
+
+[features]
+vendored-openssl = ["dep:openssl", "openssl/vendored"]
 
 [dev-dependencies]
 assert_cmd  = { workspace = true }
