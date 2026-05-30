@@ -12,7 +12,14 @@ updates:
       minor:
         applies-to: version-updates
         update-types: [minor]
+    ignore:
+      # Major bumps are reviewed and applied by hand, not auto-PR'd.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
