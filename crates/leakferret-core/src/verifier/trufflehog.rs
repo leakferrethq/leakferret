@@ -196,6 +196,12 @@ mod tests {
     use crate::finding::{Severity, Verdict};
     use std::path::PathBuf;
 
+    // Both tests mutate the process-global LEAKFERRET_TRUFFLEHOG_BIN env var;
+    // serialize them with an async mutex so they can't clobber each other's
+    // value under the parallel harness (the cause of the flaky Linux failures).
+    static ENV_LOCK: once_cell::sync::Lazy<tokio::sync::Mutex<()>> =
+        once_cell::sync::Lazy::new(|| tokio::sync::Mutex::new(()));
+
     fn finding() -> Finding {
         Finding {
             path: PathBuf::from("nonexistent.txt"),
@@ -218,6 +224,7 @@ mod tests {
 
     #[tokio::test]
     async fn unverified_when_trufflehog_not_installed() {
+        let _env = ENV_LOCK.lock().await;
         let prev = std::env::var("LEAKFERRET_TRUFFLEHOG_BIN").ok();
         std::env::set_var(
             "LEAKFERRET_TRUFFLEHOG_BIN",
@@ -247,6 +254,7 @@ mod tests {
 
     #[tokio::test]
     async fn verified_when_stub_emits_verified_record() {
+        let _env = ENV_LOCK.lock().await;
         let dir = tempfile::tempdir().expect("tempdir");
         let stub = if cfg!(windows) {
             let p = dir.path().join("trufflehog.cmd");
