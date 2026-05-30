@@ -6,6 +6,7 @@ use clap::Subcommand;
 mod baseline;
 mod catalog;
 mod mcp;
+mod progress;
 mod rewrite;
 mod scan;
 mod verify;
@@ -26,9 +27,9 @@ pub enum Cmd {
     Mcp(mcp::Args),
 }
 
-pub async fn dispatch(cmd: Cmd, verbose: u8) -> Result<i32> {
+pub async fn dispatch(cmd: Cmd, quiet: bool, verbose: u8) -> Result<i32> {
     match cmd {
-        Cmd::Scan(a) => scan::run(a).await,
+        Cmd::Scan(a) => scan::run(a, quiet, verbose).await,
         Cmd::Verify(a) => verify::run(a).await,
         Cmd::Rewrite(a) => rewrite::run(a, verbose).await,
         Cmd::Baseline(a) => baseline::run(a).await,

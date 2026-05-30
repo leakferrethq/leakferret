@@ -6,14 +6,17 @@
 //! even from the cheap subcommand.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::Result;
 use clap::Parser;
 
 use leakferret_core::{
-    reporter, Engine, EngineConfig, GitHistoryScanner, PatternRegistry, Scanner, VerifyMode,
+    reporter, Engine, EngineConfig, GitHistoryScanner, PatternRegistry, ScanProgress, Scanner,
+    VerifyMode,
 };
 
+use super::progress::Spinner;
 use super::OutputArgs;
 
 #[derive(Debug, Parser)]
@@ -46,7 +49,7 @@ pub struct Args {
     pub out: OutputArgs,
 }
 
-pub async fn run(args: Args) -> Result<i32> {
+pub async fn run(args: Args, quiet: bool, verbose: u8) -> Result<i32> {
     let canonical_only: Option<Vec<PathBuf>> = if args.out.only.is_empty() {
         None
     } else {
@@ -125,7 +128,13 @@ pub async fn run(args: Args) -> Result<i32> {
     };
     let registry = PatternRegistry::builtin();
     let scanner = Scanner::new(&cfg, &registry);
-    let findings = scanner.scan()?;
+
+    // Live progress on stderr for interactive runs; stays silent when
+    // piped, when --quiet, or when -v already streams tracing to stderr.
+    let progress = Arc::new(ScanProgress::default());
+    let spinner = (!quiet && verbose == 0).then(|| Spinner::start(Arc::clone(&progress)));
+    let findings = scanner.scan_reporting(spinner.is_some().then(|| progress.as_ref()))?;
+    drop(spinner);
 
     let mut stdout = std::io::stdout().lock();
     reporter::emit(

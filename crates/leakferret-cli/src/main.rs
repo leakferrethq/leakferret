@@ -47,7 +47,7 @@ fn run(cli: Cli) -> Result<i32> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    runtime.block_on(commands::dispatch(cli.cmd, cli.verbose))
+    runtime.block_on(commands::dispatch(cli.cmd, cli.quiet, cli.verbose))
 }
 
 fn init_tracing(quiet: bool, verbose: u8) {
