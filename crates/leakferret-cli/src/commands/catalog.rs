@@ -13,7 +13,7 @@ use leakferret_core::Catalog;
 
 /// Default URL the `refresh` subcommand fetches from when `--url` is
 /// not supplied. Will change with the project rename pass.
-pub const DEFAULT_CATALOG_URL: &str = "https://catalog.leakferret.dev/latest.json";
+pub const DEFAULT_CATALOG_URL: &str = "https://catalog.leakferret.com/latest.json";
 
 #[derive(Debug, Parser)]
 pub struct Args {
