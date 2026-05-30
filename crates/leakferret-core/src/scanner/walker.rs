@@ -77,6 +77,11 @@ pub const DEFAULT_INCLUDE_EXT: &[&str] = &[
     "containerfile",
 ];
 
+/// Directories always excluded from the walk. These hold agent/tool
+/// state — notably Claude Code worktrees under `.claude/`, which are
+/// full repo checkouts — so scanning them would duplicate the project.
+const DEFAULT_EXCLUDE_DIRS: &[&str] = &[".claude/", "**/.claude/"];
+
 /// Top-level walker configuration. Carried by [`crate::Scanner`].
 #[derive(Debug, Clone)]
 pub struct WalkConfig {
@@ -95,6 +100,16 @@ pub fn walk(cfg: &WalkConfig) -> Result<Vec<PathBuf>> {
     let include_ext: HashSet<&str> = DEFAULT_INCLUDE_EXT.iter().copied().collect();
 
     let mut overrides = OverrideBuilder::new(&cfg.root);
+    // Built-in excludes for agent/tool state. `.claude/` holds Claude
+    // Code worktrees — full checkouts of the repo — so scanning it means
+    // scanning the project N times over. Pruning the directory is both a
+    // correctness fix (no duplicate findings) and the dominant perf win
+    // on machines that use agent worktrees.
+    for pat in DEFAULT_EXCLUDE_DIRS {
+        overrides
+            .add(&format!("!{pat}"))
+            .map_err(|e| crate::Error::Other(format!("default exclude {pat:?}: {e}")))?;
+    }
     for pat in &cfg.extra_excludes {
         // `!` prefix in `ignore::overrides` *exclude*s a glob.
         overrides
@@ -213,5 +228,23 @@ mod tests {
         };
         let files = walk(&cfg).unwrap();
         assert_eq!(files.len(), 1);
+    }
+
+    #[test]
+    fn excludes_dot_claude_worktrees_by_default() {
+        let tmp = TempDir::new().unwrap();
+        std::fs::write(tmp.path().join("real.rb"), "x").unwrap();
+        let wt = tmp.path().join(".claude/worktrees/copy");
+        std::fs::create_dir_all(&wt).unwrap();
+        std::fs::write(wt.join("dup.rb"), "x").unwrap();
+        let cfg = WalkConfig {
+            root: tmp.path().to_path_buf(),
+            extra_excludes: vec![],
+            max_file_bytes: 1024,
+            only_paths: None,
+        };
+        let files = walk(&cfg).unwrap();
+        assert_eq!(files.len(), 1, "the .claude worktree copy must be skipped");
+        assert!(files[0].ends_with("real.rb"));
     }
 }
