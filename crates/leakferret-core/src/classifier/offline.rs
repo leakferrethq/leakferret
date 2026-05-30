@@ -9,8 +9,10 @@
 //!        alert-grade reason string.
 //!   2. Verifier outcome (deterministic REAL when verified).
 //!   3. Path hints (`spec/`, `fixtures/`, `.env.example`).
-//!   4. Obvious dummy markers in the secret value (`EXAMPLE`, `xxxx`).
-//!   5. Pattern severity in an app path (`app/`, `lib/`, `src/`).
+//!   4. Obvious dummy markers in the secret value (`example`, `xxxx`).
+//!   5. Env-var references (`$VAR`, `ENV[...]`, `process.env.X`) — never a leak.
+//!   6. Template placeholders / interpolation (`{password}`, `#{secret}`).
+//!   7. Pattern severity in an app path (`app/`, `lib/`, `src/`).
 
 use crate::catalog::{Catalog, CatalogVerdict};
 use crate::finding::{Finding, Severity, Verdict};
@@ -32,22 +34,103 @@ impl<'a> OfflineClassifier<'a> {
     }
 }
 
+/// Case-insensitive substring markers that betray a placeholder value.
+/// Deliberately conservative — only tokens vanishingly unlikely to appear
+/// inside a real, high-entropy credential, so a genuine leak is never
+/// suppressed. (Compared case-insensitively against the lowercased value.)
 const DUMMY_MARKERS: &[&str] = &[
-    "EXAMPLE",
     "example",
     "xxxx",
-    "XXXX",
     "test_xxx",
     "placeholder",
-    "REDACTED",
-    "CHANGEME",
-    "your-key-here",
+    "redacted",
+    "changeme",
+    "change_me",
+    "change-me",
+    "your_",
+    "your-",
     "<your",
-    "TODO",
+    "todo",
+    "sample",
+    "dummy",
+    "fakekey",
+    "fake_key",
+    "notreal",
+    "not_real",
+    "donotuse",
+    "do_not_use",
+    "replaceme",
+    "replace_me",
+    "insert_your",
+    "lorem",
 ];
 
 fn obvious_dummy(value: &str) -> bool {
-    DUMMY_MARKERS.iter().any(|m| value.contains(m))
+    let lower = value.to_ascii_lowercase();
+    DUMMY_MARKERS.iter().any(|m| lower.contains(m))
+}
+
+/// Runtime env-var accessors that mark a value as a reference, not a literal.
+const ENV_REF_TOKENS: &[&str] = &[
+    "env[",
+    "env.fetch",
+    "process.env",
+    "os.environ",
+    "os.getenv",
+    "system.getenv",
+    "getenv(",
+    "viper.get",
+    "rails.application.credentials",
+    "credentials.dig",
+    "#{env",
+    "<%= env",
+];
+
+/// Interpolation / format tokens that mark a value as a placeholder.
+const PLACEHOLDER_TOKENS: &[&str] = &["{{", "}}", "#{", "${", "%{", "<%=", "%s", "%d"];
+
+/// True when the captured value is an environment-variable reference
+/// rather than a hardcoded literal — the code is *already* reading the
+/// secret from the environment. Flagging these is a false positive for a
+/// tool whose whole thesis is "move secrets into env vars."
+fn looks_like_var_reference(value: &str) -> bool {
+    let t = value
+        .trim()
+        .trim_matches(|c| c == '"' || c == '\'' || c == '`');
+    if t.starts_with('$') {
+        return true; // $VAR, ${VAR}
+    }
+    if t.len() > 2 && t.starts_with('%') && t.ends_with('%') {
+        return true; // %VAR% (Windows)
+    }
+    let lower = t.to_ascii_lowercase();
+    ENV_REF_TOKENS.iter().any(|r| lower.contains(r))
+}
+
+/// True when the captured value is a template placeholder or format
+/// token — `{password}`, `#{secret}`, `${TOKEN}`, `<api-key>`, `****` —
+/// rather than a literal secret.
+fn looks_like_placeholder(value: &str) -> bool {
+    let t = value
+        .trim()
+        .trim_matches(|c| c == '"' || c == '\'' || c == '`');
+    if t.is_empty() {
+        return true;
+    }
+    let wrapped = (t.starts_with('{') && t.ends_with('}'))
+        || (t.starts_with('<') && t.ends_with('>'))
+        || (t.starts_with("#{") && t.ends_with('}'))
+        || (t.starts_with("${") && t.ends_with('}'))
+        || (t.starts_with("%{") && t.ends_with('}'));
+    if wrapped {
+        return true;
+    }
+    if PLACEHOLDER_TOKENS.iter().any(|tok| t.contains(tok)) {
+        return true;
+    }
+    // All-mask values: ****, xxxx, ...., ____, ----.
+    let mask = t.trim_matches(|c| matches!(c, '*' | 'x' | 'X' | '.' | '_' | '-'));
+    mask.is_empty() && t.len() >= 3
 }
 
 impl Classifier for OfflineClassifier<'_> {
@@ -114,9 +197,29 @@ impl Classifier for OfflineClassifier<'_> {
             if obvious_dummy(&f.r#match) {
                 f.verdict = Verdict::Fixture;
                 f.reason = Some(
-                    "Matched value contains a documented dummy marker (EXAMPLE / xxxx / placeholder)"
+                    "Matched value contains a documented dummy marker (example / xxxx / placeholder)"
                         .into(),
                 );
+                f.confidence = Some(0.9);
+                continue;
+            }
+
+            // 4b) Env-var reference — the code already reads the secret from
+            // the environment, so it is not a hardcoded literal at all. Must
+            // beat the app-path → REAL rule below.
+            if looks_like_var_reference(&f.r#match) {
+                f.verdict = Verdict::Fixture;
+                f.reason = Some(
+                    "Value is an environment-variable reference, not a hardcoded secret".into(),
+                );
+                f.confidence = Some(0.95);
+                continue;
+            }
+
+            // 4c) Template placeholder / interpolation token.
+            if looks_like_placeholder(&f.r#match) {
+                f.verdict = Verdict::Fixture;
+                f.reason = Some("Value is a template placeholder, not a literal secret".into());
                 f.confidence = Some(0.9);
                 continue;
             }
@@ -230,6 +333,64 @@ mod tests {
         )];
         OfflineClassifier::new(&catalog).classify(&mut fs);
         assert_eq!(fs[0].verdict, Verdict::Fixture);
+    }
+
+    #[test]
+    fn env_var_reference_is_not_a_secret() {
+        let catalog = Catalog::empty();
+        // All in an *app* path with High severity — must still be fixture,
+        // because the value is an env-var reference, not a literal.
+        let cases = [
+            "$PG_PASSWORD",
+            "${API_TOKEN}",
+            "process.env.SECRET",
+            "ENV['KEY']",
+        ];
+        for v in cases {
+            let mut fs = vec![finding("app/config.rb", v, Severity::High)];
+            OfflineClassifier::new(&catalog).classify(&mut fs);
+            assert_eq!(fs[0].verdict, Verdict::Fixture, "{v} should be fixture");
+        }
+    }
+
+    #[test]
+    fn template_placeholder_is_not_a_secret() {
+        let catalog = Catalog::empty();
+        let cases = ["{password_value}", "#{secret}", "<api-key>", "****"];
+        for v in cases {
+            let mut fs = vec![finding("app/config.rb", v, Severity::High)];
+            OfflineClassifier::new(&catalog).classify(&mut fs);
+            assert_eq!(fs[0].verdict, Verdict::Fixture, "{v} should be fixture");
+        }
+    }
+
+    #[test]
+    fn dummy_name_markers_are_fixture() {
+        let catalog = Catalog::empty();
+        for v in [
+            "sample_token",
+            "your_api_key",
+            "changeme123",
+            "do_not_use_this",
+        ] {
+            let mut fs = vec![finding("app/config.rb", v, Severity::High)];
+            OfflineClassifier::new(&catalog).classify(&mut fs);
+            assert_eq!(fs[0].verdict, Verdict::Fixture, "{v} should be fixture");
+        }
+    }
+
+    #[test]
+    fn real_looking_key_in_app_path_is_still_real() {
+        // Regression: the new heuristics must not swallow a genuine
+        // high-entropy secret sitting in application code.
+        let catalog = Catalog::empty();
+        let mut fs = vec![finding(
+            "app/config.rb",
+            "AKIAZ8K2QWERTY12POIU",
+            Severity::High,
+        )];
+        OfflineClassifier::new(&catalog).classify(&mut fs);
+        assert_eq!(fs[0].verdict, Verdict::Real);
     }
 
     #[test]
