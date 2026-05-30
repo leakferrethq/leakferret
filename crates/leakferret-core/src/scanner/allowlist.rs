@@ -31,8 +31,8 @@
 
 use std::collections::HashMap;
 
-use once_cell::sync::Lazy;
 use regex::Regex;
+use std::sync::LazyLock;
 
 /// One parsed pragma. `pattern_id == None` means "suppress all
 /// patterns on this line".
@@ -60,7 +60,7 @@ impl AllowlistMap {
         };
         pragmas
             .iter()
-            .any(|p| p.pattern_id.as_deref().map_or(true, |id| id == pattern_id))
+            .any(|p| p.pattern_id.as_deref().is_none_or(|id| id == pattern_id))
     }
 
     /// Total number of pragmas parsed across all lines (counts
@@ -80,7 +80,7 @@ impl AllowlistMap {
 /// an optional `reason="..."` clause. The leading comment marker is
 /// not needed — `#`, `//`, and `/*` all work because we match the
 /// literal anywhere in the line.
-static PRAGMA_RE: Lazy<Regex> = Lazy::new(|| {
+static PRAGMA_RE: LazyLock<Regex> = LazyLock::new(|| {
     // pattern_id is a lowercase identifier with underscores; reason is
     // a double-quoted free-form string.
     Regex::new(

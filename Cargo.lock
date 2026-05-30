@@ -1308,7 +1308,6 @@ dependencies = [
  "insta",
  "memchr",
  "mockito",
- "once_cell",
  "owo-colors",
  "parking_lot",
  "pretty_assertions",

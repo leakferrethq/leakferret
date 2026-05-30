@@ -199,8 +199,8 @@ mod tests {
     // Both tests mutate the process-global LEAKFERRET_TRUFFLEHOG_BIN env var;
     // serialize them with an async mutex so they can't clobber each other's
     // value under the parallel harness (the cause of the flaky Linux failures).
-    static ENV_LOCK: once_cell::sync::Lazy<tokio::sync::Mutex<()>> =
-        once_cell::sync::Lazy::new(|| tokio::sync::Mutex::new(()));
+    static ENV_LOCK: std::sync::LazyLock<tokio::sync::Mutex<()>> =
+        std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
 
     fn finding() -> Finding {
         Finding {

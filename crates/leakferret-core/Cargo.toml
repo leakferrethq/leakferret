@@ -26,7 +26,6 @@ serde_with    = { workspace = true }
 regex         = { workspace = true }
 ignore        = { workspace = true }
 walkdir       = { workspace = true }
-once_cell     = { workspace = true }
 parking_lot   = { workspace = true }
 rayon         = { workspace = true }
 indexmap      = { workspace = true }
