@@ -38,6 +38,12 @@ pub struct ScanProgress {
     pub scanned: AtomicUsize,
 }
 
+/// Lines longer than this are skipped by the regex pass. Real secrets
+/// are short; lines this long are minified bundles, source maps, or
+/// base64/data blobs — the dominant cost on vendored trees and a source
+/// of base64 false positives, not of genuine findings.
+const MAX_LINE_BYTES: usize = 8 * 1024;
+
 /// Orchestrates walking + scanning. Wraps a [`PatternRegistry`] and
 /// an [`EngineConfig`].
 #[derive(Debug)]
@@ -124,6 +130,11 @@ impl<'a> Scanner<'a> {
         for (idx, line) in lines.iter().enumerate() {
             let line_no = idx + 1;
             let line_no_newline = line.trim_end_matches('\n').trim_end_matches('\r');
+            // Skip minified/data lines: too long to hold a real secret,
+            // and the main driver of scan cost and base64 noise.
+            if line_no_newline.len() > MAX_LINE_BYTES {
+                continue;
+            }
             for pat_idx in self.registry.matches(line_no_newline) {
                 let Some((pattern, regex)) = self.registry.get(pat_idx) else {
                     continue;
@@ -257,6 +268,30 @@ mod tests {
             findings.is_empty(),
             "preceding-line pragma should suppress {findings:?}"
         );
+    }
+
+    #[test]
+    fn skips_secrets_on_pathologically_long_lines() {
+        let tmp = TempDir::new().unwrap();
+        // A key buried in a >8KB minified-style line is skipped (it's
+        // data, not code); the same key on a normal line is found.
+        let pad = "x".repeat(9000);
+        write(
+            &tmp.path().join("bundle.min.js"),
+            &format!("var a='{pad}AKIAIOSFODNN7EXAMPLE{pad}';\n"),
+        );
+        write(
+            &tmp.path().join("config.rb"),
+            "AWS = 'AKIAIOSFODNN7EXAMPLE'\n",
+        );
+        let cfg = EngineConfig {
+            root: tmp.path().to_path_buf(),
+            ..EngineConfig::default()
+        };
+        let registry = PatternRegistry::builtin();
+        let findings = Scanner::new(&cfg, &registry).scan().unwrap();
+        assert_eq!(findings.len(), 1, "only the normal-line key should match");
+        assert!(findings[0].path.ends_with("config.rb"));
     }
 
     #[test]
