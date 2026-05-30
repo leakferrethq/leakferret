@@ -9,7 +9,7 @@ use clap::{Parser, Subcommand};
 use leakferret_core::catalog::{
     embedded_verifying_key, verify_signature, CatalogFile, VerifyingKey,
 };
-use leakferret_core::Catalog;
+use leakferret_core::{Catalog, Engine, EngineConfig};
 
 /// Default URL the `refresh` subcommand fetches from when `--url` is
 /// not supplied. Will change with the project rename pass.
@@ -74,8 +74,15 @@ pub async fn run(args: Args) -> Result<i32> {
 
 fn load(file: Option<&std::path::Path>) -> Result<Catalog> {
     match file {
+        // An explicit --file is loaded verbatim (no chain, no signature
+        // check beyond what Catalog::load applies).
         Some(p) => Catalog::load(p, None).context("load catalog"),
-        None => Ok(Catalog::empty()),
+        // No --file: resolve the same chain the engine uses — a
+        // refreshed local snapshot if one exists, otherwise the copy
+        // bundled into the binary. This is why `catalog info` reports
+        // populated entries out of the box.
+        None => Engine::load_catalog_chain(&EngineConfig::default())
+            .context("load bundled catalog chain"),
     }
 }
 
@@ -274,6 +281,20 @@ mod tests {
 
     fn b64_pub(key: &SigningKey) -> String {
         base64::engine::general_purpose::STANDARD.encode(key.verifying_key().to_bytes())
+    }
+
+    #[test]
+    fn default_load_resolves_the_bundled_catalog() {
+        // Without --file, `catalog info`/`test` must fall through the
+        // engine chain to the snapshot compiled into the binary, not an
+        // empty catalog. Guards the regression where documented public
+        // keys were reported as unknown on a fresh install.
+        let c = load(None).expect("default catalog should resolve");
+        assert!(
+            !c.file.entries.is_empty(),
+            "bundled catalog must be populated"
+        );
+        assert!(c.lookup("sk_test_4eC39HqLyjWDarjtT1zdp7dc").is_some());
     }
 
     #[tokio::test]
