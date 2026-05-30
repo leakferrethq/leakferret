@@ -1,7 +1,11 @@
-# leakferret
+<p align="center">
+  <img src="brand/logo.png" alt="leakferret" width="440">
+</p>
 
-[![CI](https://github.com/leakferrethq/leakferret/actions/workflows/ci.yml/badge.svg)](https://github.com/leakferrethq/leakferret/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
+<p align="center">
+  <a href="https://github.com/leakferrethq/leakferret/actions/workflows/ci.yml"><img src="https://github.com/leakferrethq/leakferret/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+</p>
 
 **MCP-native secret scanner — verified findings, agent-applied rewrites.**
 
