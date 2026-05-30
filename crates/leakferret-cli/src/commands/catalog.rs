@@ -12,7 +12,7 @@ use leakferret_core::catalog::{
 use leakferret_core::{Catalog, Engine, EngineConfig};
 
 /// Default URL the `refresh` subcommand fetches from when `--url` is
-/// not supplied. Will change with the project rename pass.
+/// not supplied.
 pub const DEFAULT_CATALOG_URL: &str = "https://catalog.leakferret.com/latest.json";
 
 #[derive(Debug, Parser)]
