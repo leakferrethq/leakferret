@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="leakferret">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#13314A"/>
+      <stop offset="1" stop-color="#0C2034"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="0.5" cy="0.08" r="0.95">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="128" height="128" rx="29" fill="url(#bg)"/>
+  <rect width="128" height="128" rx="29" fill="url(#sheen)"/>
+
+  <!-- ears (small, low, wide-set — ferret, not bear) -->
+  <g fill="#F3E7CF" stroke="#F0B23E" stroke-width="2.5">
+    <circle cx="41" cy="49" r="8.5"/>
+    <circle cx="87" cy="49" r="8.5"/>
+  </g>
+  <g fill="#C9712A">
+    <circle cx="41" cy="50" r="3.4"/>
+    <circle cx="87" cy="50" r="3.4"/>
+  </g>
+
+  <!-- face with sticker-style gold outline -->
+  <path d="M64 43 C 80 43 91 51 90 66 C 89 84 77 99 64 101 C 51 99 39 84 38 66 C 37 51 48 43 64 43 Z"
+        fill="#F3E7CF" stroke="#F0B23E" stroke-width="2.5"/>
+
+  <!-- bandit mask -->
+  <path d="M43 62 C 43 56 51 54 64 54 C 77 54 85 56 85 62 C 85 69 77 71 64 71 C 51 71 43 69 43 62 Z"
+        fill="#2C4257"/>
+
+  <!-- eyes -->
+  <circle cx="54" cy="62" r="4" fill="#14253A"/>
+  <circle cx="74" cy="62" r="4" fill="#14253A"/>
+  <circle cx="52.6" cy="60.6" r="1.4" fill="#FFFFFF"/>
+  <circle cx="72.6" cy="60.6" r="1.4" fill="#FFFFFF"/>
+
+  <!-- whiskers -->
+  <g stroke="#F3E7CF" stroke-opacity="0.5" stroke-width="2" stroke-linecap="round">
+    <path d="M57 89 L41 85"/>
+    <path d="M57 93 L40 93"/>
+    <path d="M71 89 L87 85"/>
+    <path d="M71 93 L88 93"/>
+  </g>
+
+  <!-- nose -->
+  <path d="M64 84 C 67 88 69 90 69 92.5 C 69 95.5 66.8 97.5 64 97.5 C 61.2 97.5 59 95.5 59 92.5 C 59 90 61 88 64 84 Z"
+        fill="#2C4257"/>
+  <circle cx="61.8" cy="91.5" r="1.5" fill="#F0B23E"/>
+
+  <!-- the "secret found": a small gold asterisk spark -->
+  <g fill="#F0B23E" transform="translate(96,30)">
+    <rect x="-2" y="-9" width="4" height="18" rx="2"/>
+    <rect x="-2" y="-9" width="4" height="18" rx="2" transform="rotate(60)"/>
+    <rect x="-2" y="-9" width="4" height="18" rx="2" transform="rotate(120)"/>
+  </g>
+</svg>
