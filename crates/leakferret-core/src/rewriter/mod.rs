@@ -45,8 +45,16 @@ impl Rewriter {
             return None;
         }
 
-        let middle = finding.context.len() / 2;
-        let source_line = finding.context.get(middle).cloned().unwrap_or_default();
+        // Locate the captured line within the context window. The match is
+        // not always centered — near the top or bottom of a file the window
+        // is clamped — so find the line that actually contains the secret
+        // rather than assuming the middle.
+        let source_line = finding
+            .context
+            .iter()
+            .find(|l| l.contains(&finding.r#match))
+            .cloned()
+            .unwrap_or_default();
         if source_line.is_empty() {
             return None;
         }
@@ -209,6 +217,22 @@ mod tests {
         // `old_line` keeps the line for the diff but redacts the secret.
         assert_eq!(r.old_line, "AWS_ACCESS_KEY = 'AKIA...MPLE'");
         assert!(!r.old_line.contains("AKIAIOSFODNN7EXAMPLE"));
+    }
+
+    #[test]
+    fn rewrites_when_match_is_not_centered_in_context() {
+        // Near the top of a file the context window is clamped, so the
+        // captured line sits at the start, not the middle. The rewriter must
+        // still locate it (regression: it used to assume `context.len()/2`).
+        let mut f = real_finding("client.rb", "unused", "AKIAIOSFODNN7EXAMPLE");
+        f.context = vec![
+            "API_KEY = 'AKIAIOSFODNN7EXAMPLE'".into(),
+            "def initialize".into(),
+            "end".into(),
+        ];
+        let r = Rewriter::default().propose(&f).unwrap();
+        assert_eq!(r.env_var, "API_KEY");
+        assert_eq!(r.new_line, "API_KEY = ENV.fetch('API_KEY')");
     }
 
     #[test]
