@@ -9,14 +9,53 @@
 
 **MCP-native secret scanner — verified findings, agent-applied rewrites.**
 
-leakferret is one fast Rust binary that is engine, CLI, and MCP server in three
-crates. It finds hardcoded secrets and API keys in your code, confirms which
-ones are actually live by calling the provider, and rewrites the leak in place
-to read from an environment variable instead. It runs from the terminal, in CI,
-and as a tool your coding agent can call before it commits.
+leakferret is one fast Rust binary that is engine, CLI, and MCP server. It finds
+hardcoded secrets in your code, **calls the provider to confirm which ones are
+actually live**, and **rewrites the leak in place** to read from an environment
+variable. It runs in your terminal, in CI, and as a tool your coding agent calls
+before it commits — and the raw secret never leaves your machine.
 
-The full secret value never leaves your machine. Only a redacted
-`AKIA...4XYZ` preview is ever written to a report, log, or network message.
+---
+
+## What it looks like
+
+Say you accidentally commit a real key, plus the usual noise:
+
+```env
+# .env
+STRIPE_SECRET_KEY=sk_live_51QzHb7nKp9mWxYt2RsVcD4eFgHjKlMnPq
+GITHUB_TOKEN=ghp_x7Qk2mN9pR4vT8wL3bY6cF1dH5jG0sZ2aE9q
+SENDGRID_API_KEY=${SENDGRID_API_KEY}     # a reference — not a leak
+ADMIN_PASSWORD=changeme                  # a placeholder — not a leak
+AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE   # the famous docs example
+```
+
+`leakferret verify` calls each provider and tells you what is **real and live** —
+and stays quiet on the rest:
+
+```text
+$ leakferret verify .
+.env
+  L3  UNKNOWN    CRITICAL  stripe_secret   sk_l...MnPq
+  L4  VERIFIED   CRITICAL  github_token    ghp_...aE9q   ← live, rotate it now
+
+2 findings · 1 verified · 1 unknown
+```
+
+The `${SENDGRID_API_KEY}` reference, the `changeme` placeholder, and the
+well-known `AKIAIOSFODNN7EXAMPLE` example are recognized and **left out** — that
+precision is the point. Then `leakferret rewrite --apply` fixes the live one:
+
+```diff
+- GITHUB_TOKEN=ghp_x7Qk2mN9pR4vT8wL3bY6cF1dH5jG0sZ2aE9q
++ GITHUB_TOKEN=${GITHUB_TOKEN}
+```
+
+…and appends `GITHUB_TOKEN=` to `.env.example` with a seed command for your
+secret manager. **Find → confirm live → fix**, with almost no false alarms.
+
+> The full secret value never leaves your machine. Only a redacted
+> `AKIA...4XYZ` preview is ever written to a report, log, or network message.
 
 ---
 
@@ -222,13 +261,32 @@ fingerprints, never the raw secret.
 
 ## Platforms
 
-Prebuilt binaries for v0.1.0:
+Prebuilt binaries for v0.1.1:
 
 - `x86_64-unknown-linux-gnu`
 - `x86_64-apple-darwin`
 - `aarch64-apple-darwin`
 - `x86_64-pc-windows-msvc`
 - `aarch64-pc-windows-msvc`
+
+---
+
+## Verifying the binaries
+
+Every release tarball is signed with [Sigstore](https://www.sigstore.dev/) /
+cosign — keyless, via GitHub OIDC — and ships a matching `*.cosign.bundle`. You
+can prove a download was built by this repository's release workflow and was
+never tampered with:
+
+```bash
+cosign verify-blob \
+  --bundle leakferret-0.1.1-x86_64-unknown-linux-gnu.tar.gz.cosign.bundle \
+  --certificate-identity-regexp 'https://github.com/leakferrethq/leakferret/.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  leakferret-0.1.1-x86_64-unknown-linux-gnu.tar.gz
+```
+
+Each tarball also ships a `.sha256` for a basic integrity check.
 
 ---
 
