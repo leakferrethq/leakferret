@@ -90,7 +90,7 @@ pub fn get_prompt(id: Option<Value>, params: Value) -> Response {
         json!({
             "description": PROMPTS[0].description,
             "messages": [{
-                "role": "system",
+                "role": "user",
                 "content": { "type": "text", "text": SYSTEM_PROMPT },
             }]
         }),
