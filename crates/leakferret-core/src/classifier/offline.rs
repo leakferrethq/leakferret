@@ -325,9 +325,19 @@ impl Classifier for OfflineClassifier<'_> {
             f.reason = Some(match (&f.verification, self.verify_attempted) {
                 // A verifier ran but could not get a definitive answer
                 // (network error, rate limit, missing paired secret).
-                (Some(VerificationOutcome::Unverified { provider, reason }), _) => format!(
-                    "Heuristics inconclusive; provider check with {provider} was inconclusive ({reason})"
-                ),
+                (Some(VerificationOutcome::Unverified { provider, reason }), _) => {
+                    if provider == "trufflehog" && reason.contains("not installed") {
+                        // The only verifier was the optional trufflehog fallback,
+                        // which isn't installed — say that plainly rather than
+                        // surfacing it as a failed check.
+                        "Heuristics inconclusive and no native verifier covers this key type (install trufflehog for broader verification coverage)."
+                            .into()
+                    } else {
+                        format!(
+                            "Heuristics inconclusive; provider check with {provider} was inconclusive ({reason})"
+                        )
+                    }
+                }
                 // Verification ran this pass, but no verifier confirmed this
                 // (often: no provider verifier exists for this key type).
                 (_, true) => "Heuristics inconclusive and no provider confirmed it live; classify with an agent/LLM for higher precision."

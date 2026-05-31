@@ -34,7 +34,10 @@ impl Rewriter {
     /// doesn't appear in the captured context (e.g. it spans multiple
     /// lines).
     pub fn propose(self, finding: &Finding) -> Option<Replacement> {
-        if finding.verdict != Verdict::Real {
+        // Real always; Unknown when the caller opted in via the engine
+        // (the engine decides *which* findings reach this, so we accept
+        // both verdicts and reject only the clearly-not-a-secret ones).
+        if !matches!(finding.verdict, Verdict::Real | Verdict::Unknown) {
             return None;
         }
         let lang = Language::detect(&finding.path)?;

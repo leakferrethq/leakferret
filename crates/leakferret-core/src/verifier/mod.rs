@@ -214,17 +214,27 @@ impl VerifierRegistry {
                 let finding_snapshot = findings[idx].clone();
                 let ctx = ctx.clone();
                 in_flight.push(async move {
-                    let mut last_outcome = None;
+                    let mut best: Option<VerificationOutcome> = None;
                     for v in &verifiers {
                         let outcome = v.verify(&finding_snapshot, &ctx).await;
-                        // First verified result wins.
-                        if outcome.is_verified() {
-                            last_outcome = Some(outcome);
+                        // Keep the strongest signal: Verified > Invalid >
+                        // Unverified. This stops an absent fallback verifier
+                        // (e.g. trufflehog not installed → Unverified) from
+                        // erasing a definitive native result.
+                        let replace = match (&best, &outcome) {
+                            (_, VerificationOutcome::Verified { .. }) => true,
+                            (None, _) => true,
+                            (Some(VerificationOutcome::Unverified { .. }), _) => true,
+                            _ => false,
+                        };
+                        if replace {
+                            best = Some(outcome);
+                        }
+                        if matches!(best, Some(VerificationOutcome::Verified { .. })) {
                             break;
                         }
-                        last_outcome = Some(outcome);
                     }
-                    (idx, last_outcome)
+                    (idx, best)
                 });
             }
 
