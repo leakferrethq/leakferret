@@ -88,7 +88,11 @@ pub async fn run(args: Args, quiet: bool, verbose: u8) -> Result<i32> {
         if let Some(n) = args.max_depth {
             scanner = scanner.max_depth(n);
         }
+        // Indeterminate spinner so a long history walk doesn't look hung.
+        let spinner = (!quiet && verbose == 0)
+            .then(|| Spinner::start_message("scanning git history (can take a while on large repos)..."));
         let findings = scanner.scan().await?;
+        drop(spinner);
         let mut stdout = std::io::stdout().lock();
         reporter::emit(
             args.out.format(),

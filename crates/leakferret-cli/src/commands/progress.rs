@@ -59,6 +59,35 @@ impl Spinner {
     }
 }
 
+    /// Start a spinner showing a fixed message with no counts — for
+    /// indeterminate phases like a git-history scan, where we can't cheaply
+    /// know the total up front. No-op when stderr isn't a terminal.
+    pub fn start_message(message: &'static str) -> Self {
+        let stop = Arc::new(AtomicBool::new(false));
+        if !std::io::stderr().is_terminal() {
+            return Self { stop, handle: None };
+        }
+        let stop_thread = Arc::clone(&stop);
+        let handle = thread::spawn(move || {
+            let mut err = std::io::stderr();
+            let mut frame = 0usize;
+            while !stop_thread.load(Ordering::Relaxed) {
+                let spin = FRAMES[frame % FRAMES.len()];
+                let _ = write!(err, "\r  {spin} {message}");
+                let _ = err.flush();
+                frame += 1;
+                thread::sleep(TICK);
+            }
+            let _ = write!(err, "\r{:<70}\r", "");
+            let _ = err.flush();
+        });
+        Self {
+            stop,
+            handle: Some(handle),
+        }
+    }
+}
+
 impl Drop for Spinner {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
