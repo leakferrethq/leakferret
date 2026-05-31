@@ -29,9 +29,11 @@
 //! Findings from a history scan have a `path` equal to the *path inside
 //! that commit* (which may not exist in the working tree).
 
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use tokio::process::Command;
 
 use crate::finding::{Finding, Verdict};
@@ -114,83 +116,72 @@ impl<'a> GitHistoryScanner<'a> {
         self
     }
 
-    /// Drive the scan. Walks commits, diffs each against its parent, and
-    /// scans every added/modified blob. Returns a flat list of findings
-    /// sorted by (commit-walk-order, path, line, column).
+    /// Drive the scan. Enumerates every added/modified blob across the
+    /// commit range in a single `git log --raw` pass, streams their
+    /// contents through one long-lived `git cat-file --batch` process
+    /// (deduplicated by OID), then runs the regex set over them in
+    /// parallel. Returns findings sorted by (path, line, column).
     pub async fn scan(&self) -> Result<Vec<Finding>> {
-        let commits = self.list_commits().await?;
-        let total = commits.len();
+        let (subjects, entries) = self.enumerate_entries().await?;
         tracing::info!(
             target: "leakferret::scanner::git_history",
-            commits = total,
+            commits = subjects.len(),
+            blobs = entries.len(),
             repo = %self.repo_path.display(),
             "git history scan starting",
         );
 
-        let mut findings = Vec::new();
-        for (idx, sha) in commits.iter().enumerate() {
-            if idx > 0 && idx % 1000 == 0 {
-                tracing::info!(
-                    target: "leakferret::scanner::git_history",
-                    progress = idx,
-                    total,
-                    "git history scan progress",
-                );
-            }
-            let subject = self.commit_subject(sha).await.unwrap_or_default();
-            let changed = match self.changed_paths(sha).await {
-                Ok(p) => p,
-                Err(e) => {
-                    tracing::debug!(
-                        target: "leakferret::scanner::git_history",
-                        commit = %sha,
-                        error = %e,
-                        "skipping commit (diff-tree failed)",
-                    );
-                    continue;
-                }
-            };
-            for path in changed {
-                if !self.path_allowed(&path) {
-                    continue;
-                }
-                let blob = match self.read_blob(sha, &path).await {
-                    Ok(b) => b,
-                    Err(e) => {
-                        tracing::debug!(
-                            target: "leakferret::scanner::git_history",
-                            commit = %sha,
-                            path = %path.display(),
-                            error = %e,
-                            "skipping blob (git show failed)",
-                        );
-                        continue;
-                    }
+        // Read each unique blob exactly once.
+        let mut seen = HashSet::new();
+        let unique: Vec<String> = entries
+            .iter()
+            .map(|(_, _, oid)| oid)
+            .filter(|oid| seen.insert((*oid).clone()))
+            .cloned()
+            .collect();
+        let blobs = self.read_blobs(&unique).await?;
+
+        // CPU-bound regex pass, parallel over blob references. The git I/O
+        // is already done, so this is pure compute over cached bytes.
+        let mut findings: Vec<Finding> = entries
+            .par_iter()
+            .flat_map_iter(|(sha, path, oid)| {
+                let empty = Vec::new().into_iter();
+                let Some(bytes) = blobs.get(oid) else {
+                    return empty;
                 };
-                if blob.len() as u64 > self.max_blob_bytes {
-                    continue;
+                if bytes.len() as u64 > self.max_blob_bytes {
+                    return empty;
                 }
-                // Binary check.
-                if memchr::memchr(0, &blob[..blob.len().min(8192)]).is_some() {
-                    continue;
+                if memchr::memchr(0, &bytes[..bytes.len().min(8192)]).is_some() {
+                    return empty;
                 }
-                let Ok(text) = std::str::from_utf8(&blob) else {
-                    continue;
+                let Ok(text) = std::str::from_utf8(bytes) else {
+                    return empty;
                 };
-                let mut blob_findings = self.scan_text(text, &path);
-                for f in &mut blob_findings {
+                let mut fs = self.scan_text(text, path);
+                let subject = subjects.get(sha);
+                for f in &mut fs {
                     f.git_commit = Some(sha.clone());
-                    if !subject.is_empty() {
-                        f.git_commit_subject = Some(subject.clone());
+                    if let Some(s) = subject {
+                        if !s.is_empty() {
+                            f.git_commit_subject = Some(s.clone());
+                        }
                     }
                 }
-                findings.extend(blob_findings);
-            }
-        }
+                fs.into_iter()
+            })
+            .collect();
+
+        findings.sort_by(|a, b| {
+            a.path
+                .cmp(&b.path)
+                .then(a.line.cmp(&b.line))
+                .then(a.column.cmp(&b.column))
+        });
 
         tracing::info!(
             target: "leakferret::scanner::git_history",
-            commits = total,
             findings = findings.len(),
             "git history scan complete",
         );
@@ -242,15 +233,29 @@ impl<'a> GitHistoryScanner<'a> {
         findings
     }
 
-    /// `git rev-list` between `since` and `until`, capped at `max_depth`.
-    /// When `since` is omitted, walks all the way to the root commit.
-    /// When `until` is omitted, defaults to `HEAD`.
-    async fn list_commits(&self) -> Result<Vec<String>> {
+    /// One `git log --raw` pass yielding a commit→subject map and the flat
+    /// list of `(sha, path, post-image blob OID)` for every added/modified
+    /// file. Replaces the per-commit `diff-tree` + `show -s` subprocesses
+    /// with a single call.
+    #[allow(clippy::type_complexity)]
+    async fn enumerate_entries(
+        &self,
+    ) -> Result<(HashMap<String, String>, Vec<(String, PathBuf, String)>)> {
         let mut cmd = self.git();
-        cmd.arg("rev-list");
+        // quotePath=false so paths come back literal (split on the tab).
+        cmd.arg("-c").arg("core.quotePath=false").arg("log");
         if let Some(n) = self.max_depth {
             cmd.arg(format!("--max-count={n}"));
         }
+        cmd.arg("--raw")
+            .arg("--no-abbrev")
+            .arg("--no-renames")
+            .arg("--root") // root commit's tree counts as adds
+            .arg(format!("--diff-filter={DIFF_FILTER}"))
+            // SOH (\x01) prefixes commit header lines so we can tell them
+            // from `:`-prefixed raw diff lines; US (\x1f) splits SHA from
+            // subject. NUL is avoided — it truncates args on Windows.
+            .arg("--pretty=format:\x01%H\x1f%s");
         let range = match (self.since.as_deref(), self.until.as_deref()) {
             (Some(s), Some(u)) => format!("{s}..{u}"),
             (Some(s), None) => format!("{s}..HEAD"),
@@ -258,52 +263,112 @@ impl<'a> GitHistoryScanner<'a> {
             (None, None) => "HEAD".to_string(),
         };
         cmd.arg(range);
-        let output = run(cmd).await?;
-        Ok(output
-            .lines()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(str::to_string)
-            .collect())
-    }
 
-    /// First line of the commit message.
-    async fn commit_subject(&self, sha: &str) -> Result<String> {
-        let mut cmd = self.git();
-        cmd.args(["show", "-s", "--format=%s", sha]);
         let out = run(cmd).await?;
-        Ok(out.lines().next().unwrap_or("").to_string())
+        let mut subjects: HashMap<String, String> = HashMap::new();
+        let mut entries: Vec<(String, PathBuf, String)> = Vec::new();
+        let mut cur = String::new();
+        for line in out.lines() {
+            if let Some(rest) = line.strip_prefix('\x01') {
+                let mut it = rest.splitn(2, '\x1f');
+                let sha = it.next().unwrap_or("").to_string();
+                let subj = it.next().unwrap_or("").to_string();
+                cur.clone_from(&sha);
+                subjects.insert(sha, subj);
+            } else if let Some(rest) = line.strip_prefix(':') {
+                // :<mode> <mode> <src_oid> <dst_oid> <status>\t<path>
+                let Some((meta, path)) = rest.split_once('\t') else {
+                    continue;
+                };
+                let fields: Vec<&str> = meta.split_whitespace().collect();
+                if fields.len() < 4 {
+                    continue;
+                }
+                let dst = fields[3];
+                if dst.bytes().all(|b| b == b'0') {
+                    continue; // no post-image (defensive; AM excludes deletes)
+                }
+                let pb = PathBuf::from(path);
+                if !self.path_allowed(&pb) {
+                    continue;
+                }
+                entries.push((cur.clone(), pb, dst.to_string()));
+            }
+        }
+        Ok((subjects, entries))
     }
 
-    /// Paths added or modified by `sha` (relative to repo root).
-    async fn changed_paths(&self, sha: &str) -> Result<Vec<PathBuf>> {
-        let mut cmd = self.git();
-        cmd.args([
-            "diff-tree",
-            "-r",
-            "--no-commit-id",
-            "--name-only",
-            "--root", // include the root commit's tree as adds
-            &format!("--diff-filter={DIFF_FILTER}"),
-            sha,
-        ]);
-        let out = run(cmd).await?;
-        Ok(out
-            .lines()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(PathBuf::from)
-            .collect())
-    }
+    /// Read every OID's bytes via a single `git cat-file --batch` process,
+    /// reading responses concurrently with writing requests so the pipe
+    /// buffers can't deadlock. Blobs over `max_blob_bytes`, and non-blob
+    /// objects, are consumed but not buffered.
+    async fn read_blobs(&self, oids: &[String]) -> Result<HashMap<String, Vec<u8>>> {
+        use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 
-    /// `git show <sha>:<path>` — raw blob bytes.
-    async fn read_blob(&self, sha: &str, path: &Path) -> Result<Vec<u8>> {
-        // git uses forward slashes regardless of host platform.
-        let path_str = path.to_string_lossy().replace('\\', "/");
-        let spec = format!("{sha}:{path_str}");
-        let mut cmd = self.git();
-        cmd.args(["show", &spec]);
-        run_bytes(cmd).await
+        if oids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let mut child = self
+            .git()
+            .stdin(Stdio::piped())
+            .arg("cat-file")
+            .arg("--batch")
+            .spawn()
+            .map_err(|e| crate::Error::Other(format!("git cat-file spawn failed: {e}")))?;
+        let mut stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| crate::Error::Other("cat-file stdin unavailable".into()))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| crate::Error::Other("cat-file stdout unavailable".into()))?;
+
+        let requests: Vec<String> = oids.to_vec();
+        let writer = tokio::spawn(async move {
+            for oid in &requests {
+                if stdin.write_all(oid.as_bytes()).await.is_err()
+                    || stdin.write_all(b"\n").await.is_err()
+                {
+                    break;
+                }
+            }
+            let _ = stdin.flush().await;
+            // stdin drops here -> EOF -> cat-file drains and exits.
+        });
+
+        let max = self.max_blob_bytes;
+        let mut reader = BufReader::new(stdout);
+        let mut map: HashMap<String, Vec<u8>> = HashMap::new();
+        let mut header = String::new();
+        loop {
+            header.clear();
+            if reader.read_line(&mut header).await.map_err(io_err)? == 0 {
+                break;
+            }
+            // "<oid> <type> <size>"  or  "<oid> missing"
+            let parts: Vec<&str> = header.split_whitespace().collect();
+            if parts.len() != 3 {
+                continue; // missing / malformed: no content follows
+            }
+            let oid = parts[0].to_string();
+            let is_blob = parts[1] == "blob";
+            let size: usize = parts[2].parse().unwrap_or(0);
+
+            if is_blob && size as u64 <= max {
+                let mut buf = vec![0u8; size];
+                reader.read_exact(&mut buf).await.map_err(io_err)?;
+                map.insert(oid, buf);
+            } else {
+                discard(&mut reader, size).await?;
+            }
+            // Trailing newline after the object content.
+            let mut nl = [0u8; 1];
+            let _ = reader.read_exact(&mut nl).await;
+        }
+        let _ = writer.await;
+        let _ = child.wait().await;
+        Ok(map)
     }
 
     fn git(&self) -> Command {
@@ -331,19 +396,21 @@ async fn run(mut cmd: Command) -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
-async fn run_bytes(mut cmd: Command) -> Result<Vec<u8>> {
-    let output = cmd
-        .output()
-        .await
-        .map_err(|e| crate::Error::Other(format!("git invocation failed: {e}")))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(crate::Error::Other(format!(
-            "git exited with status {}: {}",
-            output.status, stderr
-        )));
+fn io_err(e: std::io::Error) -> crate::Error {
+    crate::Error::Other(format!("git cat-file read failed: {e}"))
+}
+
+/// Read and discard exactly `n` bytes (content we won't keep — oversized
+/// or non-blob objects), so the `cat-file --batch` stream stays in sync.
+async fn discard<R: tokio::io::AsyncRead + Unpin>(r: &mut R, mut n: usize) -> Result<()> {
+    use tokio::io::AsyncReadExt;
+    let mut scratch = [0u8; 8192];
+    while n > 0 {
+        let take = n.min(scratch.len());
+        r.read_exact(&mut scratch[..take]).await.map_err(io_err)?;
+        n -= take;
     }
-    Ok(output.stdout)
+    Ok(())
 }
 
 #[cfg(test)]
