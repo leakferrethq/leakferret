@@ -28,11 +28,25 @@ use super::Classifier;
 #[derive(Debug)]
 pub struct OfflineClassifier<'a> {
     catalog: &'a Catalog,
+    /// Whether provider verification was attempted this run. Drives the
+    /// wording of the inconclusive reason so it never tells the user to
+    /// "run a verifier" that already ran.
+    verify_attempted: bool,
 }
 
 impl<'a> OfflineClassifier<'a> {
     pub fn new(catalog: &'a Catalog) -> Self {
-        Self { catalog }
+        Self {
+            catalog,
+            verify_attempted: false,
+        }
+    }
+
+    /// Record that provider verification ran before this classification.
+    #[must_use]
+    pub fn verification_attempted(mut self, attempted: bool) -> Self {
+        self.verify_attempted = attempted;
+        self
     }
 }
 
@@ -308,10 +322,20 @@ impl Classifier for OfflineClassifier<'_> {
             }
 
             f.verdict = Verdict::Unknown;
-            f.reason = Some(
-                "Offline heuristics inconclusive; run with verifier or host LLM for higher precision."
+            f.reason = Some(match (&f.verification, self.verify_attempted) {
+                // A verifier ran but could not get a definitive answer
+                // (network error, rate limit, missing paired secret).
+                (Some(VerificationOutcome::Unverified { provider, reason }), _) => format!(
+                    "Heuristics inconclusive; provider check with {provider} was inconclusive ({reason})"
+                ),
+                // Verification ran this pass, but no verifier confirmed this
+                // (often: no provider verifier exists for this key type).
+                (_, true) => "Heuristics inconclusive and no provider confirmed it live; classify with an agent/LLM for higher precision."
                     .into(),
-            );
+                // Verification was not attempted (offline `scan`).
+                (_, false) => "Heuristics inconclusive; run `verify` or classify with an agent/LLM for higher precision."
+                    .into(),
+            });
             f.confidence = Some(0.3);
         }
     }
@@ -382,6 +406,28 @@ mod tests {
         )];
         OfflineClassifier::new(&catalog).classify(&mut fs);
         assert_eq!(fs[0].verdict, Verdict::Fixture);
+    }
+
+    #[test]
+    fn unverified_outcome_reports_inconclusive_not_run_a_verifier() {
+        // A verifier ran but couldn't get a definitive answer. The reason
+        // must reflect that — never tell the user to "run with verifier".
+        let catalog = Catalog::empty();
+        let mut f = finding("notes.txt", "Zk9mQ2pR7vT4wL8bY6cF1dH5", Severity::Low);
+        f.verification = Some(VerificationOutcome::Unverified {
+            provider: "github".into(),
+            reason: "unexpected HTTP 429".into(),
+        });
+        OfflineClassifier::new(&catalog)
+            .verification_attempted(true)
+            .classify(std::slice::from_mut(&mut f));
+        assert_eq!(f.verdict, Verdict::Unknown);
+        let reason = f.reason.unwrap();
+        assert!(reason.contains("github"), "names the provider: {reason}");
+        assert!(
+            !reason.contains("run `verify`") && !reason.contains("run with"),
+            "must not tell the user to run a verifier that already ran: {reason}"
+        );
     }
 
     #[test]

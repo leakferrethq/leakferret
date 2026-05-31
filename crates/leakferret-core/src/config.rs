@@ -40,6 +40,10 @@ pub struct EngineConfig {
     /// so a plain `scan`/`verify` never writes files into the user's tree;
     /// the baseline is read-only (for diffing) unless this is set.
     pub update_baseline: bool,
+    /// Propose rewrites for `Unknown` findings too, not only `Real` ones.
+    /// Lets `rewrite` fix unconfirmed candidates when there is no live
+    /// verification or host-LLM classification to promote them to `Real`.
+    pub rewrite_include_unknown: bool,
 }
 
 impl Default for EngineConfig {
@@ -59,6 +63,7 @@ impl Default for EngineConfig {
             show_fixtures: false,
             verifier_concurrency: 8,
             update_baseline: false,
+            rewrite_include_unknown: false,
         }
     }
 }

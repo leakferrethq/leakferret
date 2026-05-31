@@ -42,6 +42,12 @@ pub struct Args {
     #[arg(long)]
     pub check: bool,
 
+    /// Also propose rewrites for UNKNOWN (unconfirmed) findings, not only
+    /// confirmed-real ones. Use this to fix candidates when there is no live
+    /// verifier or host-LLM classification to promote them to REAL.
+    #[arg(long)]
+    pub include_unknown: bool,
+
     /// Secret-manager backend for seed commands.
     #[arg(long, default_value = "env",
           value_parser = ["env", "vault", "doppler", "aws-secrets-manager", "infisical"])]
@@ -64,6 +70,7 @@ pub async fn run(args: Args, verbose: u8) -> Result<i32> {
         extra_excludes: args.out.exclude.clone(),
         verify_mode: VerifyMode::BestEffort,
         rewrite_backend: backend,
+        rewrite_include_unknown: args.include_unknown,
         ..EngineConfig::default()
     };
 
@@ -106,7 +113,10 @@ struct FileDiff {
 fn build_diffs(root: &Path, findings: &[Finding]) -> Result<Vec<FileDiff>> {
     let mut by_file: BTreeMap<PathBuf, Vec<&Finding>> = BTreeMap::new();
     for f in findings {
-        if f.is_real() && f.replacement.is_some() {
+        // The engine only attaches a replacement to findings eligible for
+        // rewrite (Real, or Unknown under --include-unknown), so the
+        // presence of one is the authoritative filter here.
+        if f.replacement.is_some() {
             by_file.entry(f.path.clone()).or_default().push(f);
         }
     }
@@ -210,7 +220,7 @@ fn emit_dry_run<W: Write>(
 fn apply_rewrites(root: &Path, findings: &[Finding]) -> Result<()> {
     let mut by_file: BTreeMap<PathBuf, Vec<&Finding>> = BTreeMap::new();
     for f in findings {
-        if f.is_real() && f.replacement.is_some() {
+        if f.replacement.is_some() {
             by_file.entry(root.join(&f.path)).or_default().push(f);
         }
     }

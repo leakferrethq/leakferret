@@ -147,13 +147,16 @@ impl Engine {
 
         // 4. Classify (offline). Host-LLM classification is driven by
         //    the MCP server, not the engine.
-        let classifier = OfflineClassifier::new(&self.catalog);
+        let classifier = OfflineClassifier::new(&self.catalog)
+            .verification_attempted(cfg.verify_mode != VerifyMode::None);
         classifier.classify(&mut findings);
 
-        // 5. Rewriter — only for Real findings; non-fatal if it fails.
+        // 5. Rewriter — Real findings always; Unknown too when the caller
+        //    opted in (so `rewrite --include-unknown` can fix unconfirmed
+        //    candidates). Non-fatal if it fails.
         let rewriter = Rewriter::new(cfg.rewrite_backend);
         for f in &mut findings {
-            if f.is_real() {
+            if f.is_real() || (cfg.rewrite_include_unknown && f.is_unknown()) {
                 f.replacement = rewriter.propose(f);
             }
         }
@@ -271,7 +274,8 @@ impl Engine {
         }
 
         // 4. Classify (offline).
-        let classifier = OfflineClassifier::new(&self.catalog);
+        let classifier = OfflineClassifier::new(&self.catalog)
+            .verification_attempted(cfg.verify_mode != VerifyMode::None);
         classifier.classify(&mut findings);
 
         // 5. No rewriter, no baseline update — see the doc comment.

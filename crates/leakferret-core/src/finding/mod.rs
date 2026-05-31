@@ -115,6 +115,11 @@ impl Finding {
         matches!(self.verdict, Verdict::Fixture)
     }
 
+    /// True if classification was inconclusive (`Unknown`).
+    pub fn is_unknown(&self) -> bool {
+        matches!(self.verdict, Verdict::Unknown)
+    }
+
     /// True if verifier confirmed the secret is live.
     pub fn is_verified(&self) -> bool {
         matches!(
