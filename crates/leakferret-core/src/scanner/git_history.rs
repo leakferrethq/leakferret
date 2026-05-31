@@ -67,6 +67,7 @@ pub struct GitHistoryScanner<'a> {
     context_lines: usize,
     max_depth: Option<usize>,
     max_blob_bytes: u64,
+    all_refs: bool,
 }
 
 impl<'a> GitHistoryScanner<'a> {
@@ -83,6 +84,7 @@ impl<'a> GitHistoryScanner<'a> {
             context_lines: 3,
             max_depth: None,
             max_blob_bytes: DEFAULT_MAX_BLOB_BYTES,
+            all_refs: false,
         }
     }
 
@@ -113,6 +115,14 @@ impl<'a> GitHistoryScanner<'a> {
 
     pub fn max_blob_bytes(mut self, bytes: u64) -> Self {
         self.max_blob_bytes = bytes;
+        self
+    }
+
+    /// Scan every ref (all branches and tags) instead of just HEAD's
+    /// history — catches secrets on un-merged branches. Overrides the
+    /// `since..until` range when set.
+    pub fn all_refs(mut self, yes: bool) -> Self {
+        self.all_refs = yes;
         self
     }
 
@@ -256,13 +266,18 @@ impl<'a> GitHistoryScanner<'a> {
             // from `:`-prefixed raw diff lines; US (\x1f) splits SHA from
             // subject. NUL is avoided — it truncates args on Windows.
             .arg("--pretty=format:\x01%H\x1f%s");
-        let range = match (self.since.as_deref(), self.until.as_deref()) {
-            (Some(s), Some(u)) => format!("{s}..{u}"),
-            (Some(s), None) => format!("{s}..HEAD"),
-            (None, Some(u)) => u.to_string(),
-            (None, None) => "HEAD".to_string(),
-        };
-        cmd.arg(range);
+        if self.all_refs {
+            // Walk every branch and tag, not just HEAD's history.
+            cmd.arg("--all");
+        } else {
+            let range = match (self.since.as_deref(), self.until.as_deref()) {
+                (Some(s), Some(u)) => format!("{s}..{u}"),
+                (Some(s), None) => format!("{s}..HEAD"),
+                (None, Some(u)) => u.to_string(),
+                (None, None) => "HEAD".to_string(),
+            };
+            cmd.arg(range);
+        }
 
         let out = run(cmd).await?;
         let mut subjects: HashMap<String, String> = HashMap::new();
@@ -549,6 +564,49 @@ mod tests {
         assert!(
             !matches.contains(&"AKIAIOSFODNN7EXAMPLE"),
             "old key must be excluded by --since=HEAD~1, got {matches:?}",
+        );
+    }
+
+    /// A key committed only on an un-merged branch: HEAD-only history misses
+    /// it; `--all` finds it.
+    #[tokio::test]
+    async fn all_refs_finds_key_on_unmerged_branch() {
+        let tmp = init_repo();
+        let repo = tmp.path();
+
+        write(&repo.join("a.rb"), "PORT = 3000\n");
+        git(repo, &["add", "."]);
+        git(repo, &["commit", "-q", "-m", "init: baseline"]);
+
+        // Feature branch with a key, never merged back to main.
+        git(repo, &["checkout", "-q", "-b", "feature"]);
+        write(
+            &repo.join("b.rb"),
+            "AWS_ACCESS_KEY = 'AKIAIOSFODNN7EXAMPLE'\n",
+        );
+        git(repo, &["add", "."]);
+        git(repo, &["commit", "-q", "-m", "feat: key on branch"]);
+        git(repo, &["checkout", "-q", "main"]); // HEAD has no key
+
+        let registry = PatternRegistry::builtin();
+
+        let head_only = GitHistoryScanner::new(repo, &registry)
+            .scan()
+            .await
+            .unwrap();
+        assert!(
+            !head_only.iter().any(|f| f.pattern == "aws_access_key"),
+            "HEAD-only history must not see the feature-branch key",
+        );
+
+        let all = GitHistoryScanner::new(repo, &registry)
+            .all_refs(true)
+            .scan()
+            .await
+            .unwrap();
+        assert!(
+            all.iter().any(|f| f.pattern == "aws_access_key"),
+            "--all must find the key on the un-merged branch",
         );
     }
 }

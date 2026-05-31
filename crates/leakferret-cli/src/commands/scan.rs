@@ -45,6 +45,12 @@ pub struct Args {
     #[arg(long, value_name = "N", requires = "git")]
     pub max_depth: Option<usize>,
 
+    /// Scan every branch and tag's history, not just HEAD — catches
+    /// secrets on un-merged branches. Requires `--git`; overrides
+    /// `--since`/`--until`.
+    #[arg(long, requires = "git", conflicts_with_all = ["since", "until"])]
+    pub all: bool,
+
     #[command(flatten)]
     pub out: OutputArgs,
 }
@@ -71,7 +77,8 @@ pub async fn run(args: Args, quiet: bool, verbose: u8) -> Result<i32> {
         let registry = PatternRegistry::builtin();
         let mut scanner = GitHistoryScanner::new(&root, &registry)
             .context_lines(cfg.context_lines)
-            .max_blob_bytes(cfg.max_file_bytes);
+            .max_blob_bytes(cfg.max_file_bytes)
+            .all_refs(args.all);
         if let Some(s) = args.since.clone() {
             scanner = scanner.since(s);
         }
