@@ -19,6 +19,15 @@ Go, npm, GitHub Action, VS Code).
   OIDC). Each `*.tar.gz` ships a matching `*.cosign.bundle`, verifiable with
   `cosign verify-blob` — see "Verifying the binaries" in the README.
 
+#### Clarity
+
+- When provider verification ran but was inconclusive (rate limit, network,
+  no verifier for the key type), the finding now says so explicitly instead
+  of the misleading "run with verifier" — which had already run.
+- `rewrite --include-unknown` proposes fixes for UNKNOWN (unconfirmed)
+  candidates, so offline rewrites are no longer gated on a live verifier or
+  host-LLM classification.
+
 #### Engine (`leakferret-core`)
 
 - File walker on top of `ignore` (ripgrep's engine) — correct

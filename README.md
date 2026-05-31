@@ -201,6 +201,7 @@ leakferret verify . --verifier-timeout-secs 10
 leakferret rewrite . --apply                   # write ENV.fetch in place
 leakferret rewrite . --dry-run-diff            # show the diff, touch nothing
 leakferret rewrite . --check                   # CI mode: exit 1 if rewrites pending
+leakferret rewrite . --apply --include-unknown # also fix UNKNOWN (unconfirmed) candidates
 leakferret rewrite . --backend doppler         # seed cmds for your manager
 
 # baseline  (scan/verify are read-only — they never write to your repo)
