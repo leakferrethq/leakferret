@@ -149,6 +149,9 @@ async fn end_to_end_pipeline_never_persists_the_raw_secret() {
         verify_mode: VerifyMode::None,
         baseline_path: Some(PathBuf::from(".leakferret-baseline.json")),
         history_path: Some(PathBuf::from(".leakferret-history.jsonl")),
+        // Exercise the persisted baseline/history write path so the privacy
+        // assertions below cover it.
+        update_baseline: true,
         ..EngineConfig::default()
     };
     let engine = Engine::new(cfg);

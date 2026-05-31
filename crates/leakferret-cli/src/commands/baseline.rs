@@ -60,8 +60,32 @@ fn init(root: &std::path::Path) -> Result<i32> {
     }
     let b = baseline::Baseline::default();
     baseline::save(&path, &b).context("save baseline")?;
+    // Keep the secret salt out of git — committing it next to the
+    // fingerprints would let an attacker brute-force them.
+    ensure_gitignored(root, ".leakferret-salt").context("update .gitignore")?;
     println!("initialised baseline at {}", path.display());
+    println!(
+        "commit .leakferret-baseline.json + .leakferret-history.jsonl; .leakferret-salt is gitignored"
+    );
+    println!("then run `leakferret verify . --update-baseline` to record current findings");
     Ok(0)
+}
+
+/// Append `entry` to `<root>/.gitignore` if it isn't already listed.
+fn ensure_gitignored(root: &std::path::Path, entry: &str) -> Result<()> {
+    let gi = root.join(".gitignore");
+    let existing = std::fs::read_to_string(&gi).unwrap_or_default();
+    if existing.lines().any(|l| l.trim() == entry) {
+        return Ok(());
+    }
+    let mut content = existing;
+    if !content.is_empty() && !content.ends_with('\n') {
+        content.push('\n');
+    }
+    content.push_str(entry);
+    content.push('\n');
+    std::fs::write(&gi, content)?;
+    Ok(())
 }
 
 fn show(root: &std::path::Path) -> Result<i32> {

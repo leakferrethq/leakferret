@@ -24,6 +24,12 @@ pub struct Args {
     #[arg(long, default_value_t = 10)]
     pub verifier_timeout_secs: u64,
 
+    /// Record the current findings into the baseline (and history/salt).
+    /// Without this, `verify` is read-only and never writes to your repo —
+    /// it only diffs against an existing baseline. Use this to snapshot.
+    #[arg(long, default_value_t = false)]
+    pub update_baseline: bool,
+
     #[command(flatten)]
     pub out: OutputArgs,
 }
@@ -53,6 +59,7 @@ pub async fn run(args: Args) -> Result<i32> {
         },
         verify_mode: mode,
         verifier_timeout_secs: args.verifier_timeout_secs,
+        update_baseline: args.update_baseline,
         ..EngineConfig::default()
     };
 

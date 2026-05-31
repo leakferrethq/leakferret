@@ -81,6 +81,39 @@ pub fn load_or_create_salt(root: &Path) -> crate::Result<Vec<u8>> {
     Ok(salt)
 }
 
+/// Read the per-repo salt if it already exists; never creates it. Used by
+/// read-only runs so a plain scan/verify doesn't write `.leakferret-salt`.
+pub fn read_salt(root: &Path) -> crate::Result<Option<Vec<u8>>> {
+    let salt_path = root.join(SALT_FILE);
+    if !salt_path.exists() {
+        return Ok(None);
+    }
+    let data = std::fs::read(&salt_path).map_err(|e| crate::Error::io(&salt_path, e))?;
+    let trimmed: Vec<u8> = data
+        .iter()
+        .filter(|b| !b.is_ascii_whitespace())
+        .copied()
+        .collect();
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&trimmed)
+        .map_err(|e| crate::Error::Other(format!("salt file is not valid base64: {e}")))?;
+    if bytes.len() < 16 {
+        return Err(crate::Error::Other(format!(
+            "salt file too short ({} bytes); expected >= 16",
+            bytes.len()
+        )));
+    }
+    Ok(Some(bytes))
+}
+
+/// A random, non-persisted salt — used for output fingerprints when no
+/// baseline is being written, so a plain scan never touches the repo.
+pub fn ephemeral_salt() -> Vec<u8> {
+    let mut salt = vec![0u8; SALT_LEN];
+    rand::thread_rng().fill_bytes(&mut salt);
+    salt
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

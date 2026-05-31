@@ -36,6 +36,10 @@ pub struct EngineConfig {
     pub show_fixtures: bool,
     /// Maximum concurrent verifier HTTP calls.
     pub verifier_concurrency: usize,
+    /// Persist the baseline, history, and salt to the repo. Off by default
+    /// so a plain `scan`/`verify` never writes files into the user's tree;
+    /// the baseline is read-only (for diffing) unless this is set.
+    pub update_baseline: bool,
 }
 
 impl Default for EngineConfig {
@@ -54,6 +58,7 @@ impl Default for EngineConfig {
             catalog_path: None,
             show_fixtures: false,
             verifier_concurrency: 8,
+            update_baseline: false,
         }
     }
 }

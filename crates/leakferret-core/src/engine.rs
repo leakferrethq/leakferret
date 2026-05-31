@@ -13,7 +13,7 @@ use crate::baseline::{
 use crate::catalog::{embedded_verifying_key, Catalog};
 use crate::classifier::{Classifier, OfflineClassifier};
 use crate::config::{EngineConfig, VerifyMode};
-use crate::finding::fingerprint::load_or_create_salt;
+use crate::finding::fingerprint::{ephemeral_salt, load_or_create_salt, read_salt};
 use crate::finding::{Finding, Fingerprint};
 use crate::patterns::PatternRegistry;
 use crate::rewriter::Rewriter;
@@ -124,8 +124,15 @@ impl Engine {
         let scanner = Scanner::new(&cfg, &self.patterns);
         let mut findings = scanner.scan()?;
 
-        // 2. Fingerprint (uses per-repo salt under cfg.root).
-        let salt = load_or_create_salt(&cfg.root)?;
+        // 2. Fingerprint. Persist the per-repo salt only when explicitly
+        //    updating the baseline; otherwise reuse an existing salt
+        //    (read-only) or an ephemeral one, so a plain scan/verify never
+        //    writes `.leakferret-salt` into the user's tree.
+        let salt = if cfg.update_baseline {
+            load_or_create_salt(&cfg.root)?
+        } else {
+            read_salt(&cfg.root)?.unwrap_or_else(ephemeral_salt)
+        };
         for f in &mut findings {
             f.fingerprint = Some(Fingerprint::compute(&f.r#match, &salt));
         }
@@ -151,33 +158,50 @@ impl Engine {
             }
         }
 
-        // 6. Baseline update.
-        let baseline = if let Some(bp) = &cfg.baseline_path {
-            let bp_full = cfg.root.join(bp);
-            let mut baseline = baseline::load_or_init(&bp_full)?;
-            update_baseline(&mut baseline, &findings);
-            baseline::save(&bp_full, &baseline)?;
-            Some(baseline)
-        } else {
-            None
+        // 6. Baseline. Read-only by default — loaded (if present) only to
+        //    populate the diff in the report. It is updated and written back
+        //    *only* when update_baseline is set, so a plain scan/verify never
+        //    creates or mutates files in the user's repo.
+        let baseline = match &cfg.baseline_path {
+            Some(bp) if cfg.update_baseline => {
+                let bp_full = cfg.root.join(bp);
+                let mut baseline = baseline::load_or_init(&bp_full)?;
+                update_baseline(&mut baseline, &findings);
+                baseline::save(&bp_full, &baseline)?;
+                Some(baseline)
+            }
+            Some(bp) => {
+                let bp_full = cfg.root.join(bp);
+                if bp_full.exists() {
+                    Some(baseline::load_or_init(&bp_full)?)
+                } else {
+                    None
+                }
+            }
+            None => None,
         };
 
-        // 7. History events.
-        if let Some(hp) = &cfg.history_path {
-            let hp_full = cfg.root.join(hp);
-            for f in &findings {
-                if let Some(fp) = &f.fingerprint {
-                    let evt =
-                        HistoryEvent::detected(fp.clone(), f.path.display().to_string(), f.line);
-                    let _ = baseline::append_event(&hp_full, &evt);
-                    if f.is_verified() {
-                        if let Some(v) = &f.verification {
-                            let evt = HistoryEvent::verified_live(
-                                fp.clone(),
-                                v.provider(),
-                                "live_api_call",
-                            );
-                            let _ = baseline::append_event(&hp_full, &evt);
+        // 7. History events — appended only when updating the baseline.
+        if cfg.update_baseline {
+            if let Some(hp) = &cfg.history_path {
+                let hp_full = cfg.root.join(hp);
+                for f in &findings {
+                    if let Some(fp) = &f.fingerprint {
+                        let evt = HistoryEvent::detected(
+                            fp.clone(),
+                            f.path.display().to_string(),
+                            f.line,
+                        );
+                        let _ = baseline::append_event(&hp_full, &evt);
+                        if f.is_verified() {
+                            if let Some(v) = &f.verification {
+                                let evt = HistoryEvent::verified_live(
+                                    fp.clone(),
+                                    v.provider(),
+                                    "live_api_call",
+                                );
+                                let _ = baseline::append_event(&hp_full, &evt);
+                            }
                         }
                     }
                 }
@@ -228,8 +252,9 @@ impl Engine {
         }
         let mut findings = scanner.scan().await?;
 
-        // 2. Fingerprint.
-        let salt = load_or_create_salt(repo)?;
+        // 2. Fingerprint. History scans never update the baseline, so reuse
+        //    an existing salt if present, else an ephemeral one — never write.
+        let salt = read_salt(repo)?.unwrap_or_else(ephemeral_salt);
         for f in &mut findings {
             f.fingerprint = Some(Fingerprint::compute(&f.r#match, &salt));
         }
