@@ -41,8 +41,8 @@ impl PatternRegistry {
         })
     }
 
-    /// Built-in registry. Mirrors the Ruby `Patterns::DEFINITIONS` list
-    /// from the legacy gem (see `legacy-ruby/lib/leakferret/patterns.rb`).
+    /// Built-in registry. Mirrors the `Patterns::DEFINITIONS` list from the
+    /// pre-rewrite Ruby gem (preserved in git history).
     pub fn builtin() -> Self {
         Self::new(builtin_patterns()).expect("builtin patterns must compile")
     }

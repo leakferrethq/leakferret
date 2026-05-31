@@ -92,8 +92,8 @@ Go, npm, GitHub Action, VS Code).
 
 ### Archived
 
-The pre-alpha Ruby gem (0.0.x) now lives in `legacy-ruby/` as the
-working spec for the Rust port. It's no longer the shipping artefact.
+The pre-alpha Ruby gem (0.0.x) was the working spec for the Rust port and
+has been removed from the tree — it's preserved in git history.
 
 ## [0.0.1] — pre-alpha Ruby gem
 
