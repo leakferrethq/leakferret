@@ -164,8 +164,9 @@ leakferret rewrite . --dry-run-diff            # show the diff, touch nothing
 leakferret rewrite . --check                   # CI mode: exit 1 if rewrites pending
 leakferret rewrite . --backend doppler         # seed cmds for your manager
 
-# baseline
-leakferret baseline init                       # create .leakferret-baseline.json
+# baseline  (scan/verify are read-only — they never write to your repo)
+leakferret baseline init                       # create .leakferret-baseline.json (gitignores the salt)
+leakferret verify . --update-baseline          # record current findings into the baseline
 leakferret baseline show
 leakferret baseline ignore --fingerprint <fp>  # acknowledge a finding
 
