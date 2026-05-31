@@ -148,7 +148,8 @@ Common flags:
 ```bash
 # scan
 leakferret scan .                              # working tree
-leakferret scan . --git                        # scan commit history
+leakferret scan . --git                        # scan HEAD's commit history
+leakferret scan . --git --all                  # scan every branch / tag
 leakferret scan . --git --since HEAD~50        # bounded history window
 
 # verify
@@ -246,3 +247,8 @@ Prebuilt binaries for v0.1.0:
 
 MIT for the engine, CLI, MCP server, and all language wrappers.
 CC-BY-SA-4.0 for the fixture catalog data.
+
+[trufflehog](https://github.com/trufflesecurity/trufflehog) is an optional,
+user-installed AGPL-3.0 tool that leakferret invokes as a separate process for
+fallback verification. It is not bundled, modified, or redistributed. See
+[`NOTICE`](NOTICE).

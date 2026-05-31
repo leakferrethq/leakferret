@@ -1,0 +1,21 @@
+leakferret
+Copyright (c) 2026 Maria Khan
+
+This product is licensed under the MIT License (see LICENSE.txt). The bundled
+fixture catalog data is licensed under CC-BY-SA-4.0.
+
+---------------------------------------------------------------------------
+Optional third-party tools (not bundled or redistributed)
+---------------------------------------------------------------------------
+
+trufflehog (https://github.com/trufflesecurity/trufflehog)
+    License: AGPL-3.0
+    Use:     When a `trufflehog` binary is present on the user's PATH,
+             leakferret invokes it as a separate process for fallback
+             verification of providers it does not natively cover.
+
+    leakferret does NOT bundle, ship, download, modify, or link trufflehog,
+    and contains none of its source code. trufflehog is installed
+    independently by the user, and leakferret communicates with it only at
+    arm's length via subprocess invocation. Removing trufflehog from PATH
+    disables the fallback with no other effect.
