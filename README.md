@@ -44,14 +44,17 @@ $ leakferret verify .
 
 The `${SENDGRID_API_KEY}` reference, the `changeme` placeholder, and the
 well-known `AKIAIOSFODNN7EXAMPLE` example are recognized and **left out** — that
-precision is the point. Then `leakferret rewrite --apply` fixes the live one:
+precision is the point. Then `leakferret rewrite --apply` rewrites the
+hardcoded key **in your code** (it leaves `.env` files alone — there's nothing
+sensible to rewrite a secret *to* there):
 
 ```diff
-- GITHUB_TOKEN=ghp_x7Qk2mN9pR4vT8wL3bY6cF1dH5jG0sZ2aE9q
-+ GITHUB_TOKEN=${GITHUB_TOKEN}
+  # app/billing.rb
+- Stripe.api_key = "sk_live_51QzHb7nKp9mWxYt2RsVcD4eFgHjKlMnPq"
++ Stripe.api_key = ENV.fetch("STRIPE_API_KEY")
 ```
 
-…and appends `GITHUB_TOKEN=` to `.env.example` with a seed command for your
+…and appends `STRIPE_API_KEY=` to `.env.example` with a seed command for your
 secret manager. **Find → confirm live → fix**, with almost no false alarms.
 
 > The full secret value never leaves your machine. Only a redacted
