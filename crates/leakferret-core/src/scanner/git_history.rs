@@ -304,7 +304,10 @@ impl<'a> GitHistoryScanner<'a> {
 /// Extract the new-file start line from a hunk header `@@ -a,b +c,d @@`.
 fn parse_hunk_new_start(header: &str) -> Option<usize> {
     let after_plus = header.split('+').nth(1)?;
-    let digits: String = after_plus.chars().take_while(|c| c.is_ascii_digit()).collect();
+    let digits: String = after_plus
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect();
     digits.parse().ok()
 }
 
@@ -381,7 +384,10 @@ mod tests {
         git(repo, &["commit", "-q", "-m", "fix: remove leaked aws key"]);
 
         let registry = PatternRegistry::builtin();
-        let findings = GitHistoryScanner::new(repo, &registry).scan().await.unwrap();
+        let findings = GitHistoryScanner::new(repo, &registry)
+            .scan()
+            .await
+            .unwrap();
 
         let aws: Vec<_> = findings
             .iter()
@@ -429,12 +435,18 @@ mod tests {
 
         // Commit 2: modify the file (append an unrelated line). The key line is
         // unchanged — a full-blob scan would wrongly re-report it here.
-        write(&repo.join("c.rb"), "API = 'AKIAIOSFODNN7EXAMPLE'\nPORT = 3000\n");
+        write(
+            &repo.join("c.rb"),
+            "API = 'AKIAIOSFODNN7EXAMPLE'\nPORT = 3000\n",
+        );
         git(repo, &["add", "."]);
         git(repo, &["commit", "-q", "-m", "c2: add port"]);
 
         let registry = PatternRegistry::builtin();
-        let findings = GitHistoryScanner::new(repo, &registry).scan().await.unwrap();
+        let findings = GitHistoryScanner::new(repo, &registry)
+            .scan()
+            .await
+            .unwrap();
         let aws: Vec<_> = findings
             .iter()
             .filter(|f| f.pattern == "aws_access_key")
@@ -461,11 +473,17 @@ mod tests {
         let tmp = init_repo();
         let repo = tmp.path();
 
-        write(&repo.join("a.rb"), "AWS_ACCESS_KEY = 'AKIAIOSFODNN7EXAMPLE'\n");
+        write(
+            &repo.join("a.rb"),
+            "AWS_ACCESS_KEY = 'AKIAIOSFODNN7EXAMPLE'\n",
+        );
         git(repo, &["add", "."]);
         git(repo, &["commit", "-q", "-m", "old: plant key"]);
 
-        write(&repo.join("b.rb"), "AWS_ACCESS_KEY = 'AKIAIOSFODNN7TESTING'\n");
+        write(
+            &repo.join("b.rb"),
+            "AWS_ACCESS_KEY = 'AKIAIOSFODNN7TESTING'\n",
+        );
         git(repo, &["add", "."]);
         git(repo, &["commit", "-q", "-m", "new: another key"]);
 
@@ -496,7 +514,10 @@ mod tests {
         git(repo, &["commit", "-q", "-m", "init: baseline"]);
 
         git(repo, &["checkout", "-q", "-b", "feature"]);
-        write(&repo.join("b.rb"), "AWS_ACCESS_KEY = 'AKIAIOSFODNN7EXAMPLE'\n");
+        write(
+            &repo.join("b.rb"),
+            "AWS_ACCESS_KEY = 'AKIAIOSFODNN7EXAMPLE'\n",
+        );
         git(repo, &["add", "."]);
         git(repo, &["commit", "-q", "-m", "feat: key on branch"]);
         git(repo, &["checkout", "-q", "main"]);
