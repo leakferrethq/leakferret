@@ -22,12 +22,12 @@ before it commits — and the raw secret never leaves your machine.
 Say you accidentally commit a real key, plus the usual noise:
 
 ```env
-# .env
-STRIPE_SECRET_KEY=sk_live_51QzHb7nKp9mWxYt2RsVcD4eFgHjKlMnPq
-GITHUB_TOKEN=ghp_x7Qk2mN9pR4vT8wL3bY6cF1dH5jG0sZ2aE9q
-SENDGRID_API_KEY=${SENDGRID_API_KEY}     # a reference — not a leak
-ADMIN_PASSWORD=changeme                  # a placeholder — not a leak
-AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE   # the famous docs example
+# .env  — every key below is fabricated for this example
+STRIPE_SECRET_KEY=sk_live_FAKE_example_not_a_real_key   # fabricated
+GITHUB_TOKEN=ghp_FAKE_example_not_a_real_token          # fabricated
+SENDGRID_API_KEY=${SENDGRID_API_KEY}                    # a reference — not a leak
+ADMIN_PASSWORD=changeme                                 # a placeholder — not a leak
+AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE                  # AWS's public docs example
 ```
 
 `leakferret verify` calls each provider and tells you what is **real and live** —
@@ -36,11 +36,14 @@ and stays quiet on the rest:
 ```text
 $ leakferret verify .
 .env
-  L3  UNKNOWN    CRITICAL  stripe_secret   sk_l...MnPq
-  L4  VERIFIED   CRITICAL  github_token    ghp_...aE9q   ← live, rotate it now
+  L2  UNKNOWN    CRITICAL  stripe_secret   sk_l..._key
+  L3  VERIFIED   CRITICAL  github_token    ghp_...oken   ← live, rotate it now
 
 2 findings · 1 verified · 1 unknown
 ```
+
+<sub>The keys above are fabricated, so the `VERIFIED` line illustrates what a
+genuinely live key reports — on these examples both would be `UNKNOWN`.</sub>
 
 The `${SENDGRID_API_KEY}` reference, the `changeme` placeholder, and the
 well-known `AKIAIOSFODNN7EXAMPLE` example are recognized and **left out** — that
