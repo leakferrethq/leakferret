@@ -13,8 +13,8 @@ name = "leakferret"
 path = "src/main.rs"
 
 [dependencies]
-leakferret-core = { path = "../leakferret-core", version = "0.1.1" }
-leakferret-mcp  = { path = "../leakferret-mcp",  version = "0.1.1" }
+leakferret-core = { path = "../leakferret-core", version = "0.1.2" }
+leakferret-mcp  = { path = "../leakferret-mcp",  version = "0.1.2" }
 
 anyhow             = { workspace = true }
 clap               = { workspace = true }

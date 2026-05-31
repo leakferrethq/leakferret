@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-05-31
+
+### Changed
+
+- **Git-history scanning is now diff-only.** `scan --git` reports a secret at
+  the commit that *added* it, scanning only added lines per commit instead of
+  the full content of every file a commit touches — so a pre-existing secret is
+  no longer re-reported every time a later commit modifies the same file.
+
+### Added
+
+- `leakferret mcp` prints a short hint when run interactively (it's a stdio
+  JSON-RPC server meant to be launched by an editor/agent, not by hand).
+
 ## [0.1.1] - 2026-05-31
 
 ### Added — Rust rewrite
