@@ -279,7 +279,10 @@ fn builtin_patterns() -> Vec<Pattern> {
             "secret_assignment",
             "Generic secret-shaped assignment",
             Sev,
-            r#"(?i)(?:password|passwd|secret|token|api[_-]?key|apikey|auth[_-]?token)\s*[:=]\s*['"]([^'"\s]{12,})['"]"#,
+            // Secret-ish variable names only — deliberately NOT bare `_key`
+            // (floods on cache_key / sort_key / partition_key). The
+            // classifier triages the residue.
+            r#"(?i)(?:password|passwd|pwd|passphrase|secret|credential|token|bearer|api[_-]?key|apikey|access[_-]?key|private[_-]?key|signing[_-]?key|encryption[_-]?key|auth[_-]?token)\s*[:=]\s*['"]([^'"\s]{12,})['"]"#,
         ),
     ]
 }
@@ -319,5 +322,24 @@ mod tests {
         let r = PatternRegistry::builtin();
         let line = "GH = 'ghp_1234567890abcdefghij1234567890abcdef1234'";
         assert!(!r.matches(line).is_empty());
+    }
+
+    #[test]
+    fn secret_assignment_covers_widened_keywords() {
+        let r = PatternRegistry::builtin();
+        let is_secret_assign = |line: &str| {
+            r.matches(line)
+                .iter()
+                .any(|&i| r.get(i).unwrap().0.id == "secret_assignment")
+        };
+        // Newly covered secret-ish names.
+        assert!(is_secret_assign("AWS_ACCESS_KEY = 'wJalrXUtnFEMIK7MDENG'"));
+        assert!(is_secret_assign("private_key = 'abcdef0123456789abcd'"));
+        assert!(is_secret_assign(
+            "CLIENT_CREDENTIAL = 'abcdef0123456789abcd'"
+        ));
+        assert!(is_secret_assign("passphrase = 'correcthorsebattery12'"));
+        // Must NOT flood: a plain cache key is not a secret.
+        assert!(!is_secret_assign("cache_key = 'user_12345_profile_v2'"));
     }
 }
