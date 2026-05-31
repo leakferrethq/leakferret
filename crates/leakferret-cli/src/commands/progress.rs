@@ -57,7 +57,6 @@ impl Spinner {
             handle: Some(handle),
         }
     }
-}
 
     /// Start a spinner showing a fixed message with no counts — for
     /// indeterminate phases like a git-history scan, where we can't cheaply
