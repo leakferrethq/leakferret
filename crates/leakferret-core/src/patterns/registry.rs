@@ -239,11 +239,13 @@ fn builtin_patterns() -> Vec<Pattern> {
             "pem_private_key",
             "PEM-encoded Private Key",
             Critical,
-            // Anchored to its own line (optionally indented). A real key's
-            // header sits on its own line; a bare header *string literal* in
-            // parsing/reassembly code (`begin = "-----BEGIN…-----"`) does
-            // not, so it no longer false-fires.
-            r"^\s*(-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----)\s*$",
+            // Broad on purpose: matches the header wherever it appears —
+            // own line (multi-line PEM), or inline/escaped (`"-----BEGIN…\n…"`
+            // JSON-embedded keys, e.g. GCP service accounts). A header
+            // literal with no key body over-flags as a *false positive*,
+            // which is the safe direction for a secret scanner — far better
+            // than anchoring it and missing a real embedded key.
+            r"(-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----)",
         )
         .with_capture(1)
         .locked(),
@@ -348,16 +350,19 @@ mod tests {
     }
 
     #[test]
-    fn pem_header_matches_only_on_its_own_line() {
+    fn pem_header_matches_in_all_forms() {
         let r = PatternRegistry::builtin();
         let is_pem = |line: &str| {
             r.matches(line)
                 .iter()
                 .any(|&i| r.get(i).unwrap().0.id == "pem_private_key")
         };
-        assert!(is_pem("-----BEGIN PRIVATE KEY-----"));
+        assert!(is_pem("-----BEGIN PRIVATE KEY-----")); // own line
         assert!(is_pem("    -----BEGIN RSA PRIVATE KEY-----")); // indented (YAML)
-                                                                // A header *string literal* in parsing/reassembly code must not match.
-        assert!(!is_pem("begin = \"-----BEGIN PRIVATE KEY-----\""));
+                                                                // Single-line / JSON-embedded keys (e.g. GCP service accounts) must
+                                                                // still match — recall is non-negotiable.
+        assert!(is_pem(
+            "\"private_key\": \"-----BEGIN PRIVATE KEY-----\\nMIIEvQIBADANBgk...\""
+        ));
     }
 }

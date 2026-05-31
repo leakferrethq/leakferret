@@ -99,8 +99,21 @@ fn looks_like_var_reference(value: &str) -> bool {
     let t = value
         .trim()
         .trim_matches(|c| c == '"' || c == '\'' || c == '`');
-    if t.starts_with('$') {
-        return true; // $VAR, ${VAR}
+    if t.starts_with("${") && t.ends_with('}') {
+        return true; // ${VAR} — braced, unambiguous
+    }
+    // $VAR — a shell identifier only. Excludes bcrypt hashes (`$2a$…`, a
+    // digit right after `$`) and `$`-prefixed literal passwords with any
+    // non-identifier character, so a real secret is never suppressed.
+    if let Some(rest) = t.strip_prefix('$') {
+        if rest
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+            && rest.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
+            return true;
+        }
     }
     if t.len() > 2 && t.starts_with('%') && t.ends_with('%') {
         return true; // %VAR% (Windows)
@@ -160,18 +173,23 @@ fn is_secret_reference(value: &str, context: &[String]) -> bool {
         "secretref",
         "secret_ref",
     ];
+    let v = value
+        .trim()
+        .trim_matches(|c| c == '"' || c == '\'' || c == '`');
+    // The reference keyword must be on the *same* line as the captured value
+    // (a declaration like `from_secret: "name"`), not merely nearby — so a
+    // real secret a few lines from a `secretKeyRef` is never suppressed.
     if context.iter().any(|line| {
-        let low = line.to_ascii_lowercase();
-        REF_KEYS.iter().any(|k| low.contains(k))
+        line.contains(v) && {
+            let low = line.to_ascii_lowercase();
+            REF_KEYS.iter().any(|k| low.contains(k))
+        }
     }) {
         return true;
     }
     // ExternalSecrets-style path: lowercase words/digits split by '/', two
     // or more segments. Real secrets are high-entropy (mixed case), so this
     // won't swallow a base64 key that merely contains '/'.
-    let v = value
-        .trim()
-        .trim_matches(|c| c == '"' || c == '\'' || c == '`');
     v.contains('/')
         && v.split('/').filter(|s| !s.is_empty()).count() >= 2
         && v.chars().all(|c| {
@@ -446,6 +464,26 @@ mod tests {
         )];
         OfflineClassifier::new(&catalog).classify(&mut fs);
         assert_eq!(fs[0].verdict, Verdict::Real);
+    }
+
+    #[test]
+    fn bcrypt_and_dollar_literals_are_not_suppressed() {
+        // Recall guard: a $-prefixed value that is NOT a plain shell
+        // identifier (bcrypt hash, special chars) must never be treated as
+        // an env-var reference and suppressed.
+        let catalog = Catalog::empty();
+        for v in [
+            "$2a$10$N9qo8uLOickgx2ZMRZoMye123456789012345678901234",
+            "$ecret-P@ssw0rd-real-value-1234",
+        ] {
+            let mut fs = vec![finding("app/config.rb", v, Severity::High)];
+            OfflineClassifier::new(&catalog).classify(&mut fs);
+            assert_ne!(
+                fs[0].verdict,
+                Verdict::Fixture,
+                "{v} must not be suppressed"
+            );
+        }
     }
 
     #[test]
