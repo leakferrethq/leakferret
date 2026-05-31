@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-05-31
+
+### Fixed
+
+- MCP `classify` prompt now uses the `user` role instead of `system` — some MCP
+  clients (e.g. Cursor) reject `system`-role prompt messages, so `/classify`
+  silently failed. It works again.
+
+### Added
+
+- `scan --git` shows a progress spinner during the history walk, so a long scan
+  on a large repository no longer looks like a hang.
+
 ## [0.1.2] - 2026-05-31
 
 ### Changed
