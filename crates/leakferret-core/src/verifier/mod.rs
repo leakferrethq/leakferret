@@ -87,6 +87,19 @@ impl VerificationOutcome {
     pub fn is_invalid(&self) -> bool {
         matches!(self, Self::Invalid { .. })
     }
+
+    /// Signal strength, used to pick the best outcome across the verifiers
+    /// that handle one finding: a confirmed result beats a definitive
+    /// rejection, which beats an inconclusive one. This stops an absent
+    /// fallback (trufflehog not installed → `Unverified`) from erasing a
+    /// native verifier's verdict.
+    fn priority(&self) -> u8 {
+        match self {
+            Self::Verified { .. } => 3,
+            Self::Invalid { .. } => 2,
+            Self::Unverified { .. } => 1,
+        }
+    }
 }
 
 /// Implemented per provider.
@@ -214,23 +227,18 @@ impl VerifierRegistry {
                 let finding_snapshot = findings[idx].clone();
                 let ctx = ctx.clone();
                 in_flight.push(async move {
+                    // Keep the strongest signal across verifiers (see
+                    // `VerificationOutcome::priority`).
                     let mut best: Option<VerificationOutcome> = None;
                     for v in &verifiers {
                         let outcome = v.verify(&finding_snapshot, &ctx).await;
-                        // Keep the strongest signal: Verified > Invalid >
-                        // Unverified. This stops an absent fallback verifier
-                        // (e.g. trufflehog not installed → Unverified) from
-                        // erasing a definitive native result.
-                        let replace = matches!(
-                            (&best, &outcome),
-                            (_, VerificationOutcome::Verified { .. })
-                                | (None, _)
-                                | (Some(VerificationOutcome::Unverified { .. }), _)
-                        );
-                        if replace {
+                        if best
+                            .as_ref()
+                            .is_none_or(|b| outcome.priority() >= b.priority())
+                        {
                             best = Some(outcome);
                         }
-                        if matches!(best, Some(VerificationOutcome::Verified { .. })) {
+                        if best.as_ref().is_some_and(VerificationOutcome::is_verified) {
                             break;
                         }
                     }

@@ -214,7 +214,10 @@ fn is_secret_reference(value: &str, context: &[String]) -> bool {
 /// Reason string for an `Unknown` finding, honest about whether a verifier
 /// ran and what it found — never tells the user to "run a verifier" that has
 /// already run.
-fn inconclusive_reason(verification: &Option<VerificationOutcome>, verify_attempted: bool) -> String {
+fn inconclusive_reason(
+    verification: Option<&VerificationOutcome>,
+    verify_attempted: bool,
+) -> String {
     match (verification, verify_attempted) {
         // A verifier ran but couldn't get a definitive answer (network
         // error, rate limit, missing paired secret).
@@ -354,7 +357,10 @@ impl Classifier for OfflineClassifier<'_> {
             }
 
             f.verdict = Verdict::Unknown;
-            f.reason = Some(inconclusive_reason(&f.verification, self.verify_attempted));
+            f.reason = Some(inconclusive_reason(
+                f.verification.as_ref(),
+                self.verify_attempted,
+            ));
             f.confidence = Some(0.3);
         }
     }
