@@ -11,8 +11,10 @@
 //!   3. Path hints (`spec/`, `fixtures/`, `.env.example`).
 //!   4. Obvious dummy markers in the secret value (`example`, `xxxx`).
 //!   5. Env-var references (`$VAR`, `ENV[...]`, `process.env.X`) — never a leak.
-//!   6. Template placeholders / interpolation (`{password}`, `#{secret}`).
-//!   7. Pattern severity in an app path (`app/`, `lib/`, `src/`).
+//!   6. Template placeholders, interpolation, and low-entropy fillers
+//!      (`{password}`, `#{secret}`, `0{32}`).
+//!   7. Secret-store references (`from_secret`, `ExternalSecrets` paths).
+//!   8. Pattern severity in an app path (`app/`, `lib/`, `src/`).
 
 use crate::catalog::{Catalog, CatalogVerdict};
 use crate::finding::{Finding, Severity, Verdict};
@@ -130,7 +132,51 @@ fn looks_like_placeholder(value: &str) -> bool {
     }
     // All-mask values: ****, xxxx, ...., ____, ----.
     let mask = t.trim_matches(|c| matches!(c, '*' | 'x' | 'X' | '.' | '_' | '-'));
-    mask.is_empty() && t.len() >= 3
+    if mask.is_empty() && t.len() >= 3 {
+        return true;
+    }
+    // Very low character diversity (0{32}, aaaa…, repeated single char) —
+    // a placeholder, never a real high-entropy secret.
+    if t.len() >= 8 {
+        let distinct: std::collections::HashSet<char> = t.chars().collect();
+        if distinct.len() <= 2 {
+            return true;
+        }
+    }
+    false
+}
+
+/// True when the finding is a declarative reference to a secret store
+/// (Kubernetes `ExternalSecrets`, `from_secret:`, `secretKeyRef`, …) — the
+/// captured value is a reference name or path, not a literal secret.
+fn is_secret_reference(value: &str, context: &[String]) -> bool {
+    const REF_KEYS: &[&str] = &[
+        "from_secret",
+        "externalsecret",
+        "external-secret",
+        "secretkeyref",
+        "valuefrom",
+        "secretname",
+        "secretref",
+        "secret_ref",
+    ];
+    if context.iter().any(|line| {
+        let low = line.to_ascii_lowercase();
+        REF_KEYS.iter().any(|k| low.contains(k))
+    }) {
+        return true;
+    }
+    // ExternalSecrets-style path: lowercase words/digits split by '/', two
+    // or more segments. Real secrets are high-entropy (mixed case), so this
+    // won't swallow a base64 key that merely contains '/'.
+    let v = value
+        .trim()
+        .trim_matches(|c| c == '"' || c == '\'' || c == '`');
+    v.contains('/')
+        && v.split('/').filter(|s| !s.is_empty()).count() >= 2
+        && v.chars().all(|c| {
+            c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '/' | '-' | '_' | '.')
+        })
 }
 
 impl Classifier for OfflineClassifier<'_> {
@@ -220,6 +266,15 @@ impl Classifier for OfflineClassifier<'_> {
             if looks_like_placeholder(&f.r#match) {
                 f.verdict = Verdict::Fixture;
                 f.reason = Some("Value is a template placeholder, not a literal secret".into());
+                f.confidence = Some(0.9);
+                continue;
+            }
+
+            // 4d) Reference to a secret store (ExternalSecrets, from_secret,
+            // secretKeyRef) — a reference name/path, not a literal secret.
+            if is_secret_reference(&f.r#match, &f.context) {
+                f.verdict = Verdict::Fixture;
+                f.reason = Some("Value references a secret store, not a hardcoded secret".into());
                 f.confidence = Some(0.9);
                 continue;
             }
@@ -391,6 +446,49 @@ mod tests {
         )];
         OfflineClassifier::new(&catalog).classify(&mut fs);
         assert_eq!(fs[0].verdict, Verdict::Real);
+    }
+
+    #[test]
+    fn low_diversity_values_are_placeholders() {
+        let catalog = Catalog::empty();
+        for v in ["00000000000000000000000000000000", "aaaaaaaaaaaa"] {
+            let mut fs = vec![finding("app/config.rb", v, Severity::High)];
+            OfflineClassifier::new(&catalog).classify(&mut fs);
+            assert_eq!(fs[0].verdict, Verdict::Fixture, "{v} should be fixture");
+        }
+    }
+
+    #[test]
+    fn secret_store_references_are_not_secrets() {
+        let catalog = Catalog::empty();
+        // By context keyword (from_secret).
+        let mut f = finding(
+            "infra/idp.yaml",
+            "google_workspace_client_secret",
+            Severity::High,
+        );
+        f.context =
+            vec!["client_secret: { from_secret: \"google_workspace_client_secret\" }".into()];
+        let mut fs = vec![f];
+        OfflineClassifier::new(&catalog).classify(&mut fs);
+        assert_eq!(
+            fs[0].verdict,
+            Verdict::Fixture,
+            "from_secret ref should be fixture"
+        );
+
+        // By ExternalSecrets path shape.
+        let mut fs2 = vec![finding(
+            "app/values.yaml",
+            "go-worker-hub/prod/deploy/credentials",
+            Severity::High,
+        )];
+        OfflineClassifier::new(&catalog).classify(&mut fs2);
+        assert_eq!(
+            fs2[0].verdict,
+            Verdict::Fixture,
+            "external-secret path should be fixture"
+        );
     }
 
     #[test]

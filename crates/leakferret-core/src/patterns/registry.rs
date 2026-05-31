@@ -239,7 +239,11 @@ fn builtin_patterns() -> Vec<Pattern> {
             "pem_private_key",
             "PEM-encoded Private Key",
             Critical,
-            r"(-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----)",
+            // Anchored to its own line (optionally indented). A real key's
+            // header sits on its own line; a bare header *string literal* in
+            // parsing/reassembly code (`begin = "-----BEGIN…-----"`) does
+            // not, so it no longer false-fires.
+            r"^\s*(-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----)\s*$",
         )
         .with_capture(1)
         .locked(),
@@ -341,5 +345,19 @@ mod tests {
         assert!(is_secret_assign("passphrase = 'correcthorsebattery12'"));
         // Must NOT flood: a plain cache key is not a secret.
         assert!(!is_secret_assign("cache_key = 'user_12345_profile_v2'"));
+    }
+
+    #[test]
+    fn pem_header_matches_only_on_its_own_line() {
+        let r = PatternRegistry::builtin();
+        let is_pem = |line: &str| {
+            r.matches(line)
+                .iter()
+                .any(|&i| r.get(i).unwrap().0.id == "pem_private_key")
+        };
+        assert!(is_pem("-----BEGIN PRIVATE KEY-----"));
+        assert!(is_pem("    -----BEGIN RSA PRIVATE KEY-----")); // indented (YAML)
+                                                                // A header *string literal* in parsing/reassembly code must not match.
+        assert!(!is_pem("begin = \"-----BEGIN PRIVATE KEY-----\""));
     }
 }
