@@ -52,8 +52,8 @@ hardcoded key **in your code** (it leaves `.env` files alone — there's nothing
 sensible to rewrite a secret *to* there):
 
 ```diff
-  # app/billing.rb
-- Stripe.api_key = "sk_live_51QzHb7nKp9mWxYt2RsVcD4eFgHjKlMnPq"
+  # app/billing.rb  (fabricated example)
+- Stripe.api_key = "sk_live_FAKE_example_not_a_real_key"   # fabricated
 + Stripe.api_key = ENV.fetch("STRIPE_API_KEY")
 ```
 
