@@ -15,6 +15,10 @@ actually live**, and **rewrites the leak in place** to read from an environment
 variable. It runs in your terminal, in CI, and as a tool your coding agent calls
 before it commits — and the raw secret never leaves your machine.
 
+<p align="center">
+  <img src="brand/demo.gif" alt="leakferret finds a leaked AWS key, verifies it, and rewrites it to ENV.fetch" width="760">
+</p>
+
 ---
 
 ## What it looks like
