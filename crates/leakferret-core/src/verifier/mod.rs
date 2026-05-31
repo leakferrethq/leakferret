@@ -221,12 +221,12 @@ impl VerifierRegistry {
                         // Unverified. This stops an absent fallback verifier
                         // (e.g. trufflehog not installed → Unverified) from
                         // erasing a definitive native result.
-                        let replace = match (&best, &outcome) {
-                            (_, VerificationOutcome::Verified { .. }) => true,
-                            (None, _) => true,
-                            (Some(VerificationOutcome::Unverified { .. }), _) => true,
-                            _ => false,
-                        };
+                        let replace = matches!(
+                            (&best, &outcome),
+                            (_, VerificationOutcome::Verified { .. })
+                                | (None, _)
+                                | (Some(VerificationOutcome::Unverified { .. }), _)
+                        );
                         if replace {
                             best = Some(outcome);
                         }

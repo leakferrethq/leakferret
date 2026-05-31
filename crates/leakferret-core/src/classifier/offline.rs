@@ -211,6 +211,38 @@ fn is_secret_reference(value: &str, context: &[String]) -> bool {
         })
 }
 
+/// Reason string for an `Unknown` finding, honest about whether a verifier
+/// ran and what it found — never tells the user to "run a verifier" that has
+/// already run.
+fn inconclusive_reason(verification: &Option<VerificationOutcome>, verify_attempted: bool) -> String {
+    match (verification, verify_attempted) {
+        // A verifier ran but couldn't get a definitive answer (network
+        // error, rate limit, missing paired secret).
+        (Some(VerificationOutcome::Unverified { provider, reason }), _) => {
+            if provider == "trufflehog" && reason.contains("not installed") {
+                // The only verifier was the optional trufflehog fallback,
+                // which isn't installed — say so plainly rather than
+                // surfacing it as a failed check.
+                "Heuristics inconclusive and no native verifier covers this key type (install trufflehog for broader verification coverage)."
+                    .into()
+            } else {
+                format!("Heuristics inconclusive; provider check with {provider} was inconclusive ({reason})")
+            }
+        }
+        // Verification ran this pass, but nothing confirmed it live (often:
+        // no provider verifier exists for this key type).
+        (_, true) => {
+            "Heuristics inconclusive and no provider confirmed it live; classify with an agent/LLM for higher precision."
+                .into()
+        }
+        // Verification was not attempted (offline `scan`).
+        (_, false) => {
+            "Heuristics inconclusive; run `verify` or classify with an agent/LLM for higher precision."
+                .into()
+        }
+    }
+}
+
 impl Classifier for OfflineClassifier<'_> {
     fn classify(&self, findings: &mut [Finding]) {
         for f in findings {
@@ -322,30 +354,7 @@ impl Classifier for OfflineClassifier<'_> {
             }
 
             f.verdict = Verdict::Unknown;
-            f.reason = Some(match (&f.verification, self.verify_attempted) {
-                // A verifier ran but could not get a definitive answer
-                // (network error, rate limit, missing paired secret).
-                (Some(VerificationOutcome::Unverified { provider, reason }), _) => {
-                    if provider == "trufflehog" && reason.contains("not installed") {
-                        // The only verifier was the optional trufflehog fallback,
-                        // which isn't installed — say that plainly rather than
-                        // surfacing it as a failed check.
-                        "Heuristics inconclusive and no native verifier covers this key type (install trufflehog for broader verification coverage)."
-                            .into()
-                    } else {
-                        format!(
-                            "Heuristics inconclusive; provider check with {provider} was inconclusive ({reason})"
-                        )
-                    }
-                }
-                // Verification ran this pass, but no verifier confirmed this
-                // (often: no provider verifier exists for this key type).
-                (_, true) => "Heuristics inconclusive and no provider confirmed it live; classify with an agent/LLM for higher precision."
-                    .into(),
-                // Verification was not attempted (offline `scan`).
-                (_, false) => "Heuristics inconclusive; run `verify` or classify with an agent/LLM for higher precision."
-                    .into(),
-            });
+            f.reason = Some(inconclusive_reason(&f.verification, self.verify_attempted));
             f.confidence = Some(0.3);
         }
     }
