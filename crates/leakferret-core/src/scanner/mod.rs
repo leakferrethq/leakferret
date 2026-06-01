@@ -181,9 +181,23 @@ impl<'a> Scanner<'a> {
 }
 
 fn relative_path(root: &Path, absolute: &Path) -> PathBuf {
-    absolute
-        .strip_prefix(root)
-        .map_or_else(|_| absolute.to_path_buf(), Path::to_path_buf)
+    match absolute.strip_prefix(root) {
+        Ok(rel) if !rel.as_os_str().is_empty() => rel.to_path_buf(),
+        // root == absolute: scanning a single file directly (e.g.
+        // `leakferret rewrite src/config.js`). Stripping the root would leave an
+        // empty path, which drops the directory context the app-path classifier
+        // heuristic depends on — so the same file classified differently via
+        // `scan .` vs `scan src/config.js`. Keep the file's immediate parent so
+        // the recorded path stays e.g. `src/config.js`.
+        _ => match (
+            absolute.parent().and_then(Path::file_name),
+            absolute.file_name(),
+        ) {
+            (Some(parent), Some(file)) => Path::new(parent).join(file),
+            (None, Some(file)) => PathBuf::from(file),
+            _ => absolute.to_path_buf(),
+        },
+    }
 }
 
 #[cfg(test)]
@@ -191,6 +205,20 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::TempDir;
+
+    #[test]
+    fn relative_path_is_stable_for_single_file_and_dir_roots() {
+        // The same file must produce the same recorded path whether the scan
+        // root is the directory (`scan .`) or the file itself
+        // (`rewrite src/config.js`). Otherwise the app-path classifier sees
+        // different inputs and the same key classifies REAL vs UNKNOWN.
+        let file = Path::new("/work/proj/src/config.js");
+        let want = PathBuf::from("src").join("config.js");
+        // root == the directory
+        assert_eq!(relative_path(Path::new("/work/proj"), file), want);
+        // root == the file (single-file scan): must keep `src/config.js`
+        assert_eq!(relative_path(file, file), want);
+    }
 
     fn write(path: &Path, content: &str) {
         if let Some(parent) = path.parent() {
