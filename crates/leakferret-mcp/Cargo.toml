@@ -12,7 +12,7 @@ description   = "MCP (Model Context Protocol) server for leakferret — exposes 
 path = "src/lib.rs"
 
 [dependencies]
-leakferret-core = { path = "../leakferret-core", version = "0.1.3" }
+leakferret-core = { path = "../leakferret-core", version = "0.1.4" }
 
 anyhow             = { workspace = true }
 serde              = { workspace = true }

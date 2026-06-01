@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-06-01
+
+### Added
+
+- `--fail-on <none|any|real|verified>` on `scan` and `verify`. `--fail-on any`
+  exits non-zero on any non-fixture finding, which makes
+  `leakferret verify . --verify-mode none --fail-on any` a fully offline
+  pre-commit / CI gate. The default exit-code behaviour is unchanged.
+
+### Fixed
+
+- `--only <paths>` matched nothing on Windows: the walker compared its absolute
+  paths against the raw argument, so a relative path never matched and the scan
+  silently covered no files. Both sides are now normalised (canonicalised), so
+  pre-commit hooks that pass staged paths work across platforms.
+
 ## [0.1.3] - 2026-05-31
 
 ### Fixed
