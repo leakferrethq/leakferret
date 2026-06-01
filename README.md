@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/leakferrethq/leakferret/actions/workflows/ci.yml"><img src="https://github.com/leakferrethq/leakferret/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE.txt"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=leakferret.leakferret"><img src="https://img.shields.io/visual-studio-marketplace/v/leakferret.leakferret?label=VS%20Code&logo=visualstudiocode" alt="VS Code Marketplace"></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=leakferret.leakferret"><img src="https://img.shields.io/badge/VS%20Code-Marketplace-007ACC?logo=visualstudiocode&logoColor=white" alt="VS Code Marketplace"></a>
 </p>
 
 **MCP-native secret scanner — verified findings, agent-applied rewrites.**
