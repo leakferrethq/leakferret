@@ -203,6 +203,7 @@ leakferret scan . --git --since HEAD~50        # bounded history window
 
 # verify
 leakferret verify .                            # best-effort verification
+leakferret verify . --verify-mode none --fail-on any  # offline gate: exit 1 on any finding
 leakferret verify . --only-verified            # emit only confirmed-live keys
 leakferret verify . --verify-mode ever-verified  # fail on historical leaks
 leakferret verify . --verifier-timeout-secs 10
@@ -227,9 +228,34 @@ leakferret catalog refresh                      # fetch + signature-verify updat
 ```
 
 Shared flags on `scan` / `verify` / `rewrite`: `--format`, `--show-fixtures`,
-`--exclude <glob>`, `--only <path>`, `--only-verified`.
+`--exclude <glob>`, `--only <path>`, `--only-verified`,
+`--fail-on <none|any|real|verified>`.
 `--backend` accepts `env`, `vault`, `doppler`, `aws-secrets-manager`,
 `infisical`.
+
+---
+
+## Block commits locally (pre-commit hook)
+
+Catch a secret before it is ever committed. From your repo root:
+
+```bash
+cat > .git/hooks/pre-commit <<'HOOK'
+#!/bin/sh
+# Offline secret scan (no network). Blocks the commit on any finding.
+leakferret verify . --verify-mode none --fail-on any || {
+  echo "leakferret blocked this commit. Bypass: git commit --no-verify"
+  exit 1
+}
+HOOK
+chmod +x .git/hooks/pre-commit
+```
+
+`--verify-mode none` keeps it fully offline; `--fail-on any` exits non-zero on
+any non-fixture finding (documented examples like `AKIAIOSFODNN7EXAMPLE` are
+still ignored). Pair it with `leakferret baseline init` so the hook only blocks
+on *new* secrets. To share the hook with a team, commit it to `.githooks/` and
+run `git config core.hooksPath .githooks` once.
 
 ---
 
