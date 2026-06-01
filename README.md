@@ -257,6 +257,18 @@ still ignored). Pair it with `leakferret baseline init` so the hook only blocks
 on *new* secrets. To share the hook with a team, commit it to `.githooks/` and
 run `git config core.hooksPath .githooks` once.
 
+The hook runs on **any** git client — the terminal, GitHub Desktop, the
+VS Code Source Control panel, JetBrains, and so on — because they all run git's
+pre-commit hook. A blocked commit shows the leakferret output in that client's
+"commit failed" dialog.
+
+**A pre-commit hook is a local convenience, not a wall.** Anyone — or any AI
+agent — can skip it with `git commit --no-verify`, and git offers no way to
+forbid that locally. So treat the hook as fast feedback, and make the
+[GitHub Action](https://github.com/leakferrethq/leakferret-action) (or the same
+`leakferret verify` step in your CI) the **enforcing** gate: it runs
+server-side on every push and pull request, where `--no-verify` can't reach it.
+
 ---
 
 ## Output formats
