@@ -163,6 +163,13 @@ Claude Code):
 }
 ```
 
+For **Claude Code**, save that block as `.mcp.json` in your project root, or add
+it with one command:
+
+```bash
+claude mcp add leakferret -- npx -y @leakferret/mcp
+```
+
 If you installed the native binary, you can point at it directly instead:
 
 ```json
@@ -175,6 +182,9 @@ If you installed the native binary, you can point at it directly instead:
   }
 }
 ```
+
+leakferret is also listed in the [MCP Registry](https://registry.modelcontextprotocol.io)
+as `io.github.leakferrethq/leakferret`, so registry-aware clients can discover it.
 
 Tools exposed: `scan_repository`, `classify_candidates`, `verify_finding`,
 `propose_rewrite`, and `baseline_diff`. A `classify` prompt is also provided so
