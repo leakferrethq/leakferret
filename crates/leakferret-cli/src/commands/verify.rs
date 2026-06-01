@@ -49,14 +49,11 @@ pub async fn run(args: Args) -> Result<i32> {
             _ => VerifyMode::BestEffort,
         }
     };
+    let (root, only) = super::resolve_scan_target(&args.path, &args.out.only);
     let cfg = EngineConfig {
-        root: args.path.canonicalize().unwrap_or(args.path.clone()),
+        root,
         extra_excludes: args.out.exclude.clone(),
-        only_paths: if args.out.only.is_empty() {
-            None
-        } else {
-            Some(args.out.only.clone())
-        },
+        only_paths: (!only.is_empty()).then_some(only),
         verify_mode: mode,
         verifier_timeout_secs: args.verifier_timeout_secs,
         update_baseline: args.update_baseline,

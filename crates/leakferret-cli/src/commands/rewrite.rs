@@ -65,8 +65,10 @@ pub async fn run(args: Args, verbose: u8) -> Result<i32> {
         "infisical" => RewriteBackend::Infisical,
         _ => RewriteBackend::Env,
     };
+    let (root, only) = super::resolve_scan_target(&args.path, &args.out.only);
     let cfg = EngineConfig {
-        root: args.path.canonicalize().unwrap_or(args.path.clone()),
+        root,
+        only_paths: (!only.is_empty()).then_some(only),
         extra_excludes: args.out.exclude.clone(),
         verify_mode: VerifyMode::BestEffort,
         rewrite_backend: backend,
