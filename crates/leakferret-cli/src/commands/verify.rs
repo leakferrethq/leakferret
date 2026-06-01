@@ -84,5 +84,8 @@ pub async fn run(args: Args) -> Result<i32> {
         &mut stdout,
         args.out.show_fixtures,
     )?;
-    Ok(report.ci_exit_code(mode))
+    Ok(match args.out.fail_on {
+        Some(f) => f.exit_code(&report.findings),
+        None => report.ci_exit_code(mode),
+    })
 }

@@ -3,7 +3,7 @@
 //! extension filters.
 
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use ignore::{overrides::OverrideBuilder, WalkBuilder};
 
@@ -89,8 +89,16 @@ pub struct WalkConfig {
 /// Walk the configured root and return an absolute-path list of files
 /// that survived gitignore + extension + size filters.
 pub fn walk(cfg: &WalkConfig) -> Result<Vec<PathBuf>> {
-    let only: Option<HashSet<PathBuf>> =
-        cfg.only_paths.as_ref().map(|v| v.iter().cloned().collect());
+    // `--only` paths and the walked paths can differ in form (relative vs
+    // absolute, `/` vs `\`, and Windows' `\\?\` verbatim prefix), so compare
+    // them by canonical form. Both sides go through the same function, so they
+    // match on every platform — previously a relative `--only app/x.py` never
+    // matched the walker's absolute paths on Windows and silently scanned
+    // nothing.
+    let only: Option<HashSet<PathBuf>> = cfg
+        .only_paths
+        .as_ref()
+        .map(|v| v.iter().map(|p| canonicalize_relaxed(p)).collect());
 
     let include_ext: HashSet<&str> = DEFAULT_INCLUDE_EXT.iter().copied().collect();
 
@@ -130,7 +138,7 @@ pub fn walk(cfg: &WalkConfig) -> Result<Vec<PathBuf>> {
         let path = entry.into_path();
 
         if let Some(only) = &only {
-            if !only.contains(&path) {
+            if !only.contains(&canonicalize_relaxed(&path)) {
                 continue;
             }
         }
@@ -166,6 +174,13 @@ pub fn walk(cfg: &WalkConfig) -> Result<Vec<PathBuf>> {
 
 fn exceeds_size(path: &std::path::Path, limit: u64) -> bool {
     std::fs::metadata(path).is_ok_and(|m| m.len() > limit)
+}
+
+/// Canonicalize `p`, falling back to the path as-is if it cannot be resolved
+/// (e.g. it does not exist). Used to compare `--only` paths against walked
+/// paths in a form that is stable across platforms.
+fn canonicalize_relaxed(p: &Path) -> PathBuf {
+    std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf())
 }
 
 /// True if `path` is a `.claude/worktrees` directory. Claude Code keeps
@@ -216,6 +231,29 @@ mod tests {
         let files = walk(&cfg).unwrap();
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with("kept.rb"));
+    }
+
+    #[test]
+    fn only_paths_match_after_normalization() {
+        // A `--only` path given in a non-canonical form (here with a `..`
+        // component) must still match the walked file. Before normalizing both
+        // sides this silently matched nothing — notably on Windows, where the
+        // relative `--only` argument and the walker's absolute paths differed
+        // in form, so a pre-commit hook scanned nothing and never blocked.
+        let tmp = TempDir::new().unwrap();
+        std::fs::write(tmp.path().join("a.rb"), "x").unwrap();
+        std::fs::write(tmp.path().join("b.rb"), "y").unwrap();
+        std::fs::create_dir_all(tmp.path().join("sub")).unwrap();
+        let noncanonical = tmp.path().join("sub").join("..").join("a.rb");
+        let cfg = WalkConfig {
+            root: tmp.path().to_path_buf(),
+            extra_excludes: vec![],
+            max_file_bytes: 1024,
+            only_paths: Some(vec![noncanonical]),
+        };
+        let files = walk(&cfg).unwrap();
+        assert_eq!(files.len(), 1, "only the targeted file should be scanned");
+        assert!(files[0].ends_with("a.rb"));
     }
 
     #[test]

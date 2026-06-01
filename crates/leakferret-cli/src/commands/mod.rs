@@ -62,10 +62,46 @@ pub struct OutputArgs {
     /// `--verify-mode only-verified`.
     #[arg(long)]
     pub only_verified: bool,
+
+    /// Make the CLI exit non-zero when findings at this level are present.
+    /// Omitted keeps the historical behaviour (exit 1 only on a REAL finding
+    /// for `scan`, or per `--verify-mode` for `verify`). Use `--fail-on any`
+    /// in a pre-commit hook or CI to block on every detected secret; pair it
+    /// with `--verify-mode none` to stay fully offline.
+    #[arg(long, value_enum, value_name = "LEVEL")]
+    pub fail_on: Option<FailOn>,
 }
 
 impl OutputArgs {
     pub fn format(&self) -> leakferret_core::ReporterFormat {
         leakferret_core::ReporterFormat::from_str(&self.format).unwrap_or_default()
+    }
+}
+
+/// Threshold at which the CLI exits non-zero, selected by `--fail-on`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum FailOn {
+    /// Never exit non-zero on findings.
+    None,
+    /// Exit non-zero if any non-fixture finding is present (real or unknown).
+    Any,
+    /// Exit non-zero only on findings classified real.
+    Real,
+    /// Exit non-zero only on findings verified live against the provider.
+    Verified,
+}
+
+impl FailOn {
+    /// Exit code (0 or 1) for `findings` under this policy. FIXTURE findings
+    /// (documented public examples) never count, so `--fail-on any` still
+    /// ignores `AKIAIOSFODNN7EXAMPLE` and friends.
+    pub fn exit_code(self, findings: &[leakferret_core::Finding]) -> i32 {
+        let hit = match self {
+            FailOn::None => false,
+            FailOn::Any => findings.iter().any(|f| !f.is_fixture()),
+            FailOn::Real => findings.iter().any(leakferret_core::Finding::is_real),
+            FailOn::Verified => findings.iter().any(leakferret_core::Finding::is_verified),
+        };
+        i32::from(hit)
     }
 }

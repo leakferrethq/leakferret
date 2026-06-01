@@ -101,7 +101,10 @@ pub async fn run(args: Args, quiet: bool, verbose: u8) -> Result<i32> {
             &mut stdout,
             args.out.show_fixtures,
         )?;
-        return Ok(reporter::exit_code(&findings));
+        return Ok(match args.out.fail_on {
+            Some(f) => f.exit_code(&findings),
+            None => reporter::exit_code(&findings),
+        });
     }
 
     // --only-verified upgrades the cheap scan into a full Engine run so
@@ -129,7 +132,10 @@ pub async fn run(args: Args, quiet: bool, verbose: u8) -> Result<i32> {
             &mut stdout,
             args.out.show_fixtures,
         )?;
-        return Ok(report.ci_exit_code(VerifyMode::OnlyVerified));
+        return Ok(match args.out.fail_on {
+            Some(f) => f.exit_code(&report.findings),
+            None => report.ci_exit_code(VerifyMode::OnlyVerified),
+        });
     }
 
     let cfg = EngineConfig {
@@ -155,7 +161,10 @@ pub async fn run(args: Args, quiet: bool, verbose: u8) -> Result<i32> {
         &mut stdout,
         args.out.show_fixtures,
     )?;
-    Ok(reporter::exit_code(&findings))
+    Ok(match args.out.fail_on {
+        Some(f) => f.exit_code(&findings),
+        None => reporter::exit_code(&findings),
+    })
 }
 
 fn canonicalize_relaxed(p: &Path) -> PathBuf {
