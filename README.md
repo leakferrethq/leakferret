@@ -307,7 +307,7 @@ network calls at all, use `leakferret scan` instead of `verify`, or pass
 
 ## Platforms
 
-Prebuilt binaries for v0.1.5:
+Prebuilt binaries for v0.1.6:
 
 - `x86_64-unknown-linux-gnu`
 - `x86_64-apple-darwin`
@@ -326,10 +326,10 @@ never tampered with:
 
 ```bash
 cosign verify-blob \
-  --bundle leakferret-0.1.5-x86_64-unknown-linux-gnu.tar.gz.cosign.bundle \
+  --bundle leakferret-0.1.6-x86_64-unknown-linux-gnu.tar.gz.cosign.bundle \
   --certificate-identity-regexp 'https://github.com/leakferrethq/leakferret/.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  leakferret-0.1.5-x86_64-unknown-linux-gnu.tar.gz
+  leakferret-0.1.6-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Each tarball also ships a `.sha256` for a basic integrity check.

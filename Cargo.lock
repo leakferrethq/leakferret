@@ -1261,7 +1261,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "leakferret-cli"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1293,7 +1293,7 @@ dependencies = [
 
 [[package]]
 name = "leakferret-core"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "async-trait",
  "base64",
@@ -1333,7 +1333,7 @@ dependencies = [
 
 [[package]]
 name = "leakferret-mcp"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "async-trait",
