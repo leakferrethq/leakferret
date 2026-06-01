@@ -162,6 +162,12 @@ impl<'a> GitHistoryScanner<'a> {
         if self.all_refs {
             cmd.arg("--all");
         } else {
+            if let Some(s) = self.since.as_deref() {
+                self.verify_rev(s).await?;
+            }
+            if let Some(u) = self.until.as_deref() {
+                self.verify_rev(u).await?;
+            }
             let range = match (self.since.as_deref(), self.until.as_deref()) {
                 (Some(s), Some(u)) => format!("{s}..{u}"),
                 (Some(s), None) => format!("{s}..HEAD"),
@@ -298,6 +304,31 @@ impl<'a> GitHistoryScanner<'a> {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
         cmd
+    }
+
+    /// Validate that a `--since`/`--until` revision resolves to a commit, so a
+    /// bad value (e.g. `HEAD~5` in a 3-commit repo) returns a clear message
+    /// instead of git's raw "fatal: ambiguous argument" output.
+    async fn verify_rev(&self, rev: &str) -> Result<()> {
+        let mut cmd = self.git();
+        cmd.arg("rev-parse")
+            .arg("--verify")
+            .arg("--quiet")
+            .arg(format!("{rev}^{{commit}}"));
+        let ok = cmd
+            .output()
+            .await
+            .map_err(|e| crate::Error::Other(format!("git invocation failed: {e}")))?
+            .status
+            .success();
+        if ok {
+            Ok(())
+        } else {
+            Err(crate::Error::Other(format!(
+                "revision '{rev}' does not exist in this repository \
+                 (run `git log --oneline` to see how many commits there are)"
+            )))
+        }
     }
 }
 
