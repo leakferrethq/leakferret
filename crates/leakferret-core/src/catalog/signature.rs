@@ -16,32 +16,18 @@ use super::CatalogFile;
 /// Base64-encoded raw 32 bytes of the project's Ed25519 public key,
 /// embedded at compile time.
 ///
-/// # Current state
+/// Catalog files loaded via `leakferret catalog refresh`, and any
+/// previously-refreshed copy on disk, must be signed with the matching
+/// private key or loading them fails. The bundled snapshot compiled into
+/// the binary is loaded with `expected_key = None` (it is part of the
+/// trusted build artefact), so this does not affect default scans.
 ///
-/// This is `None` because the project's signing keypair has not been
-/// generated yet. Per HLD, that is blocked on domain ownership for the
-/// catalog CDN (`https://catalog.<domain>/<version>.json`). Until then:
-///
-/// * The bundled snapshot ships unsigned — it travels with the binary
-///   build artefact, so signing it would be paperwork without value
-///   (you already trust the binary).
-/// * `Catalog::parse` / `Catalog::load` are called with `expected_key`
-///   = `None` for the bundled snapshot, so signature enforcement is
-///   skipped entirely.
-/// * `leakferret catalog refresh` also skips signature enforcement
-///   while this constant is `None`, unless the caller passes
-///   `--verify-key <BASE64>` explicitly.
-///
-/// # Migration note
-///
-/// When the project key is generated (once we own the catalog domain),
-/// replace `None` with `Some("<base64 32 bytes of the public key>")`.
-/// From that point on, **all catalog files served from the CDN must be
-/// signed with the matching private key** or `leakferret catalog
-/// refresh` will refuse them. See
-/// `leakferret-catalog/tools/sign/README.md` for the offline
-/// key-management procedure.
-pub const EMBEDDED_PUBLIC_KEY: Option<&str> = None;
+/// The matching private key is kept offline and as the catalog repo's CI
+/// signing secret; see `leakferret-catalog/tools/sign/README.md` for the
+/// key-management procedure. To rotate, generate a new keypair, replace the
+/// bytes below (and the expected value in the test), and re-sign every
+/// published catalog file.
+pub const EMBEDDED_PUBLIC_KEY: Option<&str> = Some("VxGTRy8eoWkb6k9s7noAbtSybHve4mGYymhV7y70cRI=");
 
 /// Decode [`EMBEDDED_PUBLIC_KEY`] into a [`VerifyingKey`].
 ///
@@ -161,14 +147,13 @@ mod tests {
     }
 
     #[test]
-    fn embedded_key_is_none_until_keypair_is_generated() {
-        // Sanity guard: while the project's signing keypair has not been
-        // generated, the embedded constant must remain None so the
-        // bundled snapshot and refresh subcommand do not enforce
-        // signatures. When the keypair is generated and the constant is
-        // populated, this test should be updated to assert the public
-        // key bytes match the published key.
-        assert!(EMBEDDED_PUBLIC_KEY.is_none());
-        assert!(embedded_verifying_key().unwrap().is_none());
+    fn embedded_public_key_is_valid_and_pinned() {
+        // The project's signing keypair is generated. The embedded constant
+        // must decode to a valid 32-byte Ed25519 verifying key. If the key is
+        // rotated, update the expected value here to match the new public key.
+        const EXPECTED: &str = "VxGTRy8eoWkb6k9s7noAbtSybHve4mGYymhV7y70cRI=";
+        assert_eq!(EMBEDDED_PUBLIC_KEY, Some(EXPECTED));
+        let key = embedded_verifying_key().expect("embedded key must decode");
+        assert!(key.is_some(), "embedded key must produce a verifying key");
     }
 }
