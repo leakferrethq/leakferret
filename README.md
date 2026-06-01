@@ -256,6 +256,15 @@ Verification sends the key straight from your machine to the provider.
 leakferret has no servers and collects nothing. Baselines store one-way HMAC
 fingerprints, never the raw secret.
 
+**One operational caveat about `verify`.** Verification makes a real,
+authenticated request per candidate, so it lands in the key owner's own audit
+log — an AWS STS `GetCallerIdentity` shows up in CloudTrail, a GitHub token
+check shows up as token use, and so on. Point `verify` only at repositories
+whose secrets are yours to test; running it against someone else's code means
+authenticating into their accounts and leaving traces there. To scan with no
+network calls at all, use `leakferret scan` instead of `verify`, or pass
+`--verify-mode none`.
+
 ---
 
 ## How it compares

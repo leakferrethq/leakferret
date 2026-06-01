@@ -72,4 +72,21 @@ Out of scope:
 - Issues that require a modified or malicious build of leakferret itself.
 - Output from automated scanners with no demonstrated, reproducible impact.
 
+## Operational note: verification makes live calls
+
+`leakferret verify` authenticates each candidate against its real provider, so a
+verification attempt is a genuine API call from your machine to that provider.
+Two consequences are worth knowing:
+
+- It appears in the **key owner's** audit log. An AWS STS `GetCallerIdentity`
+  shows up in CloudTrail, a GitHub token check shows up as token use, and so on.
+  Run `verify` only against repositories whose secrets are yours to test.
+  Running it on third-party code authenticates into accounts you do not own and
+  leaves traces there.
+- Verifiers use read-only or identity endpoints only. They never make a call
+  that changes state on the account.
+
+To scan with no network calls at all, use `leakferret scan` (detection only) or
+pass `--verify-mode none`.
+
 Thank you for helping keep leakferret and the people who rely on it safe.
