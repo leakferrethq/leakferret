@@ -25,6 +25,16 @@ mod stripe;
 mod trufflehog;
 mod twilio;
 
+// Token-only verifiers (fixed-host whoami endpoints).
+mod figma;
+mod groq;
+mod huggingface;
+mod linear;
+mod notion;
+mod postman;
+mod replicate;
+mod square;
+
 pub use anthropic::AnthropicVerifier;
 pub use aws::AwsVerifier;
 pub use datadog::DatadogVerifier;
@@ -41,6 +51,15 @@ pub use slack::SlackVerifier;
 pub use stripe::StripeVerifier;
 pub use trufflehog::TrufflehogVerifier;
 pub use twilio::TwilioVerifier;
+
+pub use figma::FigmaVerifier;
+pub use groq::GroqVerifier;
+pub use huggingface::HuggingFaceVerifier;
+pub use linear::LinearVerifier;
+pub use notion::NotionVerifier;
+pub use postman::PostmanVerifier;
+pub use replicate::ReplicateVerifier;
+pub use square::SquareVerifier;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -180,6 +199,16 @@ impl VerifierRegistry {
         r.register(Arc::new(NpmTokenVerifier));
         r.register(Arc::new(PyPiTokenVerifier));
         r.register(Arc::new(DigitalOceanVerifier));
+        // Token-only verifiers (fixed-host whoami endpoints). Live-untested;
+        // confirm each with a real key before relying on its verdict.
+        r.register(Arc::new(HuggingFaceVerifier));
+        r.register(Arc::new(SquareVerifier));
+        r.register(Arc::new(LinearVerifier));
+        r.register(Arc::new(NotionVerifier));
+        r.register(Arc::new(PostmanVerifier));
+        r.register(Arc::new(FigmaVerifier));
+        r.register(Arc::new(ReplicateVerifier));
+        r.register(Arc::new(GroqVerifier));
         // Credibility-borrow fallback — must be last so it never
         // out-races a provider-native verifier for the same pattern.
         r.register(Arc::new(TrufflehogVerifier));
@@ -292,6 +321,22 @@ mod tests {
         assert!(!r.for_pattern("github_token").is_empty());
         assert!(!r.for_pattern("stripe_secret").is_empty());
         assert!(r.for_pattern("nonexistent").is_empty());
+        // Token-only verifiers added on top of the trufflehog fallback.
+        for id in [
+            "huggingface_token",
+            "square_token",
+            "linear_key",
+            "notion_token",
+            "postman_key",
+            "figma_token",
+            "replicate_token",
+            "groq_key",
+        ] {
+            assert!(
+                r.for_pattern(id).len() >= 2,
+                "{id} should resolve to a native verifier + trufflehog fallback"
+            );
+        }
     }
 
     #[tokio::test]

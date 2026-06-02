@@ -70,6 +70,15 @@ pub(crate) const TRUFFLEHOG_HANDLES: &[&str] = &[
     "mongodb_url",
     "redis_url_auth",
     "secret_assignment",
+    // Token-only providers with native verifiers; trufflehog stays the backstop.
+    "huggingface_token",
+    "square_token",
+    "linear_key",
+    "notion_token",
+    "postman_key",
+    "figma_token",
+    "replicate_token",
+    "groq_key",
 ];
 
 #[derive(Debug, Default)]
