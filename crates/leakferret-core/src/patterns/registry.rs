@@ -280,6 +280,196 @@ fn builtin_patterns() -> Vec<Pattern> {
             High,
             r#"\b(rediss?://[^:\s'"]*:[^@\s'"]+@[^\s'"]+)\b"#,
         ),
+        // ----- More AI / LLM providers -----
+        Pattern::new(
+            "huggingface_token",
+            "Hugging Face Access Token",
+            High,
+            r"\b(hf_[A-Za-z0-9]{34,})\b",
+        ),
+        Pattern::new("groq_key", "Groq API Key", High, r"\b(gsk_[A-Za-z0-9]{52})\b"),
+        Pattern::new(
+            "perplexity_key",
+            "Perplexity API Key",
+            High,
+            r"\b(pplx-[A-Za-z0-9]{40,})\b",
+        ),
+        Pattern::new(
+            "replicate_token",
+            "Replicate API Token",
+            High,
+            r"\b(r8_[A-Za-z0-9]{37,})\b",
+        ),
+        // ----- Source / CI / packaging -----
+        Pattern::new(
+            "gitlab_runner_token",
+            "GitLab Runner Authentication Token",
+            High,
+            r"\b(glrt-[A-Za-z0-9_-]{20})\b",
+        ),
+        Pattern::new(
+            "google_oauth_secret",
+            "Google OAuth Client Secret",
+            High,
+            r"\b(GOCSPX-[A-Za-z0-9_-]{28})\b",
+        ),
+        Pattern::new(
+            "atlassian_token",
+            "Atlassian / Jira API Token",
+            High,
+            r"\b(ATATT3[A-Za-z0-9_=.-]{180,})\b",
+        ),
+        Pattern::new(
+            "figma_token",
+            "Figma Personal Access Token",
+            High,
+            r"\b(figd_[A-Za-z0-9_-]{40,})\b",
+        ),
+        Pattern::new(
+            "rubygems_key",
+            "RubyGems API Key",
+            High,
+            r"\b(rubygems_[a-f0-9]{48})\b",
+        ),
+        // ----- SaaS / platform tokens (distinctive prefixes) -----
+        Pattern::new(
+            "shopify_token",
+            "Shopify Access Token",
+            Critical,
+            r"\b(shp(?:at|ss|pa|ca)_[a-fA-F0-9]{32})\b",
+        )
+        .locked(),
+        Pattern::new(
+            "square_token",
+            "Square Access Token",
+            Critical,
+            r"\b(sq0(?:atp|csp)-[A-Za-z0-9_-]{22,})\b",
+        )
+        .locked(),
+        Pattern::new(
+            "databricks_token",
+            "Databricks Personal Access Token",
+            Critical,
+            r"\b(dapi[a-f0-9]{32})\b",
+        )
+        .locked(),
+        Pattern::new(
+            "vault_token",
+            "HashiCorp Vault Service Token",
+            Critical,
+            r"\b(hvs\.[A-Za-z0-9_-]{24,})\b",
+        )
+        .locked(),
+        Pattern::new(
+            "doppler_token",
+            "Doppler Token",
+            High,
+            r"\b(dp\.(?:pt|st|ct|sa)\.[A-Za-z0-9]{40,})\b",
+        ),
+        Pattern::new(
+            "linear_key",
+            "Linear API Key",
+            High,
+            r"\b(lin_api_[A-Za-z0-9]{40,})\b",
+        ),
+        Pattern::new(
+            "notion_token",
+            "Notion Integration Token",
+            High,
+            r"\b(ntn_[A-Za-z0-9]{36,})\b",
+        ),
+        Pattern::new(
+            "postman_key",
+            "Postman API Key",
+            High,
+            r"\b(PMAK-[a-f0-9]{24}-[a-f0-9]{34})\b",
+        ),
+        Pattern::new(
+            "planetscale_token",
+            "PlanetScale Token",
+            High,
+            r"\b(pscale_(?:tkn|pw)_[A-Za-z0-9_-]{32,})\b",
+        ),
+        Pattern::new(
+            "supabase_token",
+            "Supabase Access Token",
+            High,
+            r"\b(sbp_[a-f0-9]{40})\b",
+        ),
+        Pattern::new(
+            "grafana_token",
+            "Grafana Service Account Token",
+            High,
+            r"\b(glsa_[A-Za-z0-9]{32}_[a-f0-9]{8})\b",
+        ),
+        Pattern::new(
+            "tailscale_key",
+            "Tailscale Auth/API Key",
+            High,
+            r"\b(tskey-(?:auth|api)-[A-Za-z0-9-]{20,})\b",
+        ),
+        Pattern::new(
+            "newrelic_key",
+            "New Relic User API Key",
+            High,
+            r"\b(NRAK-[A-Z0-9]{27})\b",
+        ),
+        Pattern::new(
+            "sentry_token",
+            "Sentry Auth Token",
+            High,
+            r"\b(sntrys_[A-Za-z0-9_=.-]{60,})\b",
+        ),
+        Pattern::new(
+            "dropbox_token",
+            "Dropbox Access Token",
+            High,
+            r"\b(sl\.[A-Za-z0-9_-]{130,})\b",
+        ),
+        Pattern::new(
+            "flutterwave_secret",
+            "Flutterwave Secret Key",
+            Critical,
+            r"\b(FLWSECK-[a-f0-9]{32}-X)\b",
+        )
+        .locked(),
+        Pattern::new(
+            "airtable_token",
+            "Airtable Personal Access Token",
+            High,
+            r"\b(pat[A-Za-z0-9]{14}\.[a-f0-9]{64})\b",
+        ),
+        Pattern::new(
+            "brevo_key",
+            "Brevo (Sendinblue) API Key",
+            High,
+            r"\b(xkeysib-[a-f0-9]{64}-[A-Za-z0-9]{16})\b",
+        ),
+        Pattern::new(
+            "mailchimp_key",
+            "Mailchimp API Key",
+            Medium,
+            r"\b([a-f0-9]{32}-us[0-9]{1,2})\b",
+        ),
+        // ----- Messaging bot tokens / webhooks -----
+        Pattern::new(
+            "discord_bot_token",
+            "Discord Bot Token",
+            High,
+            r"\b([MNO][A-Za-z0-9_-]{23,25}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,38})\b",
+        ),
+        Pattern::new(
+            "discord_webhook",
+            "Discord Webhook URL",
+            Medium,
+            r"\b(https://(?:ptb\.|canary\.)?discord(?:app)?\.com/api/webhooks/[0-9]+/[A-Za-z0-9_-]+)\b",
+        ),
+        Pattern::new(
+            "telegram_bot_token",
+            "Telegram Bot Token",
+            High,
+            r"\b([0-9]{8,10}:[A-Za-z0-9_-]{35})\b",
+        ),
         // ----- Generic (the noisy one) -----
         Pattern::new(
             "secret_assignment",
@@ -364,5 +554,36 @@ mod tests {
         assert!(is_pem(
             "\"private_key\": \"-----BEGIN PRIVATE KEY-----\\nMIIEvQIBADANBgk...\""
         ));
+    }
+
+    #[test]
+    fn registry_expanded_past_fifty_providers() {
+        // Detection breadth: keep the catalog ahead of the 35-type competitors.
+        assert!(
+            PatternRegistry::builtin().len() >= 50,
+            "expected >=50 patterns after expansion, got {}",
+            PatternRegistry::builtin().len()
+        );
+    }
+
+    #[test]
+    fn detects_expanded_provider_tokens() {
+        let r = PatternRegistry::builtin();
+        let has = |line: &str, id: &str| {
+            r.matches(line).iter().any(|&i| r.get(i).unwrap().0.id == id)
+        };
+        // Assemble the test tokens at runtime so this repo never holds a
+        // literal secret-shaped string — which a scanner (including GitHub's
+        // own push protection) would otherwise flag on the diff.
+        let hf = format!("hf_{}", "abcdefghijklmnopqrstuvwxyzABCDEFGH");
+        let groq = format!("gsk_{}", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        let shopify = format!("shpat_{}", "0123456789abcdef0123456789abcdef");
+        let vault = format!("hvs.{}", "A".repeat(24));
+        let telegram = format!("{}:{}", "123456789", "ABCdefGHIjklMNOpqrSTUvwxYZ012345_-x");
+        assert!(has(&format!("HF = '{hf}'"), "huggingface_token"));
+        assert!(has(&format!("GROQ = '{groq}'"), "groq_key"));
+        assert!(has(&format!("SHOPIFY = '{shopify}'"), "shopify_token"));
+        assert!(has(&format!("VAULT = '{vault}'"), "vault_token"));
+        assert!(has(&format!("TG = '{telegram}'"), "telegram_bot_token"));
     }
 }
