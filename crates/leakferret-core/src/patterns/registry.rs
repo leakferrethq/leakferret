@@ -347,6 +347,16 @@ fn builtin_patterns() -> Vec<Pattern> {
         )
         .locked(),
         Pattern::new(
+            "square_access_token",
+            "Square Access Token (modern EAAA… form)",
+            Critical,
+            // EAAA… also prefixes Meta tokens, so require a `square…token`
+            // label nearby to avoid false positives. The generic
+            // secret_assignment pattern still catches the unlabelled case.
+            r#"(?i)square[_-]?(?:access[_-]?)?token\s*[:=]\s*['"]?(EAAA[A-Za-z0-9_-]{40,})['"]?"#,
+        )
+        .locked(),
+        Pattern::new(
             "databricks_token",
             "Databricks Personal Access Token",
             Critical,

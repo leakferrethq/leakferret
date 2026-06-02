@@ -73,6 +73,7 @@ pub(crate) const TRUFFLEHOG_HANDLES: &[&str] = &[
     // Token-only providers with native verifiers; trufflehog stays the backstop.
     "huggingface_token",
     "square_token",
+    "square_access_token",
     "linear_key",
     "notion_token",
     "postman_key",

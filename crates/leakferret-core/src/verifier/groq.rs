@@ -1,5 +1,5 @@
 //! Groq API-key verifier. `GET /openai/v1/models` with a Bearer token.
-//! Untested against a live key — confirm with a real token before trusting.
+//! Confirmed live against a real token.
 
 use async_trait::async_trait;
 use serde_json::json;

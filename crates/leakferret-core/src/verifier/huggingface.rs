@@ -1,5 +1,5 @@
 //! Hugging Face token verifier. `GET /api/whoami-v2` with a Bearer token.
-//! Untested against a live key — confirm with a real token before trusting.
+//! Confirmed live against a real token.
 
 use async_trait::async_trait;
 use serde_json::json;

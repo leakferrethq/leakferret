@@ -1,5 +1,5 @@
 //! Notion integration-token verifier. `GET /v1/users/me` with a Bearer token.
-//! Untested against a live key — confirm with a real token before trusting.
+//! Confirmed live against a real token.
 
 use async_trait::async_trait;
 use serde_json::json;

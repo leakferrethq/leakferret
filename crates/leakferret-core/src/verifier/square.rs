@@ -1,5 +1,5 @@
 //! Square access-token verifier. `GET /v2/locations` with a Bearer token.
-//! Untested against a live key — confirm with a real token before trusting.
+//! Confirmed live against a real `EAAA…` access token.
 
 use async_trait::async_trait;
 use serde_json::json;
@@ -21,7 +21,7 @@ impl Verifier for SquareVerifier {
     }
 
     fn handles(&self) -> &'static [&'static str] {
-        &["square_token"]
+        &["square_token", "square_access_token"]
     }
 
     async fn verify(&self, finding: &Finding, ctx: &VerifierContext) -> VerificationOutcome {

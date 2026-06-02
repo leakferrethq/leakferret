@@ -335,6 +335,7 @@ mod tests {
         for id in [
             "huggingface_token",
             "square_token",
+            "square_access_token",
             "linear_key",
             "notion_token",
             "postman_key",

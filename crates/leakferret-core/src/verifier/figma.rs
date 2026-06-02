@@ -1,5 +1,5 @@
 //! Figma token verifier. `GET /v1/me` with the `X-Figma-Token` header.
-//! Untested against a live key — confirm with a real token before trusting.
+//! Confirmed live against a real token.
 
 use async_trait::async_trait;
 use serde_json::json;

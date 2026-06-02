@@ -1,7 +1,7 @@
 //! Linear API-key verifier. GraphQL `{ viewer { id } }` with the raw key in
 //! the `Authorization` header (Linear personal API keys are sent bare, not as
 //! a Bearer token). A bad key returns HTTP 400 from the GraphQL endpoint.
-//! Untested against a live key — confirm with a real token before trusting.
+//! Confirmed live against a real token.
 
 use async_trait::async_trait;
 use serde_json::json;
