@@ -35,6 +35,10 @@ mod postman;
 mod replicate;
 mod square;
 
+// Tenant-scoped verifiers (host pulled from the finding's context).
+mod databricks;
+mod shopify;
+
 pub use anthropic::AnthropicVerifier;
 pub use aws::AwsVerifier;
 pub use datadog::DatadogVerifier;
@@ -60,6 +64,9 @@ pub use notion::NotionVerifier;
 pub use postman::PostmanVerifier;
 pub use replicate::ReplicateVerifier;
 pub use square::SquareVerifier;
+
+pub use databricks::DatabricksVerifier;
+pub use shopify::ShopifyVerifier;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -209,6 +216,9 @@ impl VerifierRegistry {
         r.register(Arc::new(FigmaVerifier));
         r.register(Arc::new(ReplicateVerifier));
         r.register(Arc::new(GroqVerifier));
+        // Tenant-scoped: verify only when the host is found in context.
+        r.register(Arc::new(ShopifyVerifier));
+        r.register(Arc::new(DatabricksVerifier));
         // Credibility-borrow fallback — must be last so it never
         // out-races a provider-native verifier for the same pattern.
         r.register(Arc::new(TrufflehogVerifier));
@@ -331,6 +341,8 @@ mod tests {
             "figma_token",
             "replicate_token",
             "groq_key",
+            "shopify_token",
+            "databricks_token",
         ] {
             assert!(
                 r.for_pattern(id).len() >= 2,

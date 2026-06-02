@@ -360,8 +360,47 @@ fn build_verifier_context(cfg: &EngineConfig, findings: &[Finding]) -> Result<Ve
             pair.entry(k).or_insert(v);
         }
     }
+    // Tenant-scoped tokens (Shopify, Databricks, ...) can't be verified from the
+    // token alone — they need the host/tenant. Mirror trufflehog: pull it out of
+    // the surrounding context so those verifiers have somewhere to call.
+    extract_paired_hosts(findings, &mut pair);
     ctx.paired_secrets = pair;
     Ok(ctx)
+}
+
+/// Scan finding context for the host/tenant a tenant-scoped verifier needs and
+/// stash it in the pair map (e.g. a `*.myshopify.com` domain → `SHOPIFY_DOMAIN`).
+fn extract_paired_hosts(findings: &[Finding], pair: &mut HashMap<String, String>) {
+    use std::sync::OnceLock;
+    static HOSTS: OnceLock<Vec<(&'static str, regex::Regex)>> = OnceLock::new();
+    let hosts = HOSTS.get_or_init(|| {
+        vec![
+            (
+                "SHOPIFY_DOMAIN",
+                regex::Regex::new(r"([a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com)").unwrap(),
+            ),
+            (
+                "DATABRICKS_HOST",
+                regex::Regex::new(
+                    r"([a-zA-Z0-9-]+\.cloud\.databricks\.com|adb-[0-9]+\.[0-9]+\.azuredatabricks\.net)",
+                )
+                .unwrap(),
+            ),
+        ]
+    });
+    for f in findings {
+        let mut hay = f.context.join("\n");
+        hay.push('\n');
+        hay.push_str(&f.r#match);
+        for (key, re) in hosts {
+            if pair.contains_key(*key) {
+                continue;
+            }
+            if let Some(m) = re.captures(&hay).and_then(|c| c.get(1)) {
+                pair.insert((*key).to_string(), m.as_str().to_string());
+            }
+        }
+    }
 }
 
 fn update_baseline(baseline: &mut Baseline, findings: &[Finding]) {
@@ -399,5 +438,60 @@ fn update_baseline(baseline: &mut Baseline, findings: &[Finding]) {
         } else if f.is_fixture() {
             entry.status = BaselineStatus::Fixture;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::finding::{Severity, Verdict};
+
+    fn finding_with_context(pattern: &str, value: &str, context: Vec<String>) -> Finding {
+        Finding {
+            path: std::path::PathBuf::from("a.env"),
+            line: 1,
+            column: 1,
+            r#match: value.into(),
+            pattern: pattern.into(),
+            severity: Severity::High,
+            context,
+            verdict: Verdict::Unknown,
+            reason: None,
+            confidence: None,
+            verification: None,
+            fingerprint: None,
+            replacement: None,
+            git_commit: None,
+            git_commit_subject: None,
+        }
+    }
+
+    #[test]
+    fn extracts_tenant_hosts_from_context() {
+        // The token value is irrelevant here (host extraction reads the
+        // surrounding context, not the token), so use a harmless placeholder
+        // rather than a real-shaped token that trips push protection.
+        let findings = vec![
+            finding_with_context(
+                "shopify_token",
+                "redacted",
+                vec!["SHOPIFY_STORE=acme-store.myshopify.com".into()],
+            ),
+            finding_with_context(
+                "databricks_token",
+                "redacted",
+                vec!["host: dbc-12345678-9abc.cloud.databricks.com".into()],
+            ),
+        ];
+        let mut pair: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        extract_paired_hosts(&findings, &mut pair);
+        assert_eq!(
+            pair.get("SHOPIFY_DOMAIN").map(String::as_str),
+            Some("acme-store.myshopify.com")
+        );
+        assert_eq!(
+            pair.get("DATABRICKS_HOST").map(String::as_str),
+            Some("dbc-12345678-9abc.cloud.databricks.com")
+        );
     }
 }

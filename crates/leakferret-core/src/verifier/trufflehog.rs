@@ -79,6 +79,8 @@ pub(crate) const TRUFFLEHOG_HANDLES: &[&str] = &[
     "figma_token",
     "replicate_token",
     "groq_key",
+    "shopify_token",
+    "databricks_token",
 ];
 
 #[derive(Debug, Default)]
