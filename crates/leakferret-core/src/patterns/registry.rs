@@ -570,13 +570,18 @@ mod tests {
     fn detects_expanded_provider_tokens() {
         let r = PatternRegistry::builtin();
         let has = |line: &str, id: &str| {
-            r.matches(line).iter().any(|&i| r.get(i).unwrap().0.id == id)
+            r.matches(line)
+                .iter()
+                .any(|&i| r.get(i).unwrap().0.id == id)
         };
         // Assemble the test tokens at runtime so this repo never holds a
         // literal secret-shaped string — which a scanner (including GitHub's
         // own push protection) would otherwise flag on the diff.
         let hf = format!("hf_{}", "abcdefghijklmnopqrstuvwxyzABCDEFGH");
-        let groq = format!("gsk_{}", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        let groq = format!(
+            "gsk_{}",
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        );
         let shopify = format!("shpat_{}", "0123456789abcdef0123456789abcdef");
         let vault = format!("hvs.{}", "A".repeat(24));
         let telegram = format!("{}:{}", "123456789", "ABCdefGHIjklMNOpqrSTUvwxYZ012345_-x");
