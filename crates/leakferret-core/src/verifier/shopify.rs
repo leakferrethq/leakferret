@@ -1,5 +1,5 @@
 //! Shopify access-token verifier. Tenant-scoped: it needs the shop domain,
-//! which the engine extracts from the finding's context into paired_secrets as
+//! which the engine extracts from the finding's context into `paired_secrets` as
 //! `SHOPIFY_DOMAIN`. `GET https://{shop}/admin/api/2024-04/shop.json` with the
 //! `X-Shopify-Access-Token` header. Confirmed live (including the client-credentials exchange path).
 
