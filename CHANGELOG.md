@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] - 2026-06-03
+
+### Added
+- Detection for ~28 more secret types (**60+ total**): Hugging Face, Groq,
+  Perplexity, Replicate, GitLab runner tokens, Google OAuth secrets, Atlassian,
+  Figma, RubyGems, Shopify, Square (incl. the modern `EAAA…` form), Databricks,
+  Vault, Doppler, Linear, Notion, Postman, PlanetScale, Supabase, Grafana,
+  Tailscale, New Relic, Sentry, Dropbox, Flutterwave, Airtable, Brevo,
+  Mailchimp, Discord, and Telegram.
+- Live provider verification for 10 more providers (**~25 total**): Hugging
+  Face, Groq, Replicate, Notion, Postman, Figma, Linear, Square, Shopify, and
+  Databricks. Each confirmed against the real provider API.
+- Context host-extraction: tenant-scoped tokens (Shopify, Databricks) are
+  verified by pulling the shop domain / workspace host out of the surrounding
+  context, the way trufflehog does.
+
+### Fixed
+- Databricks verification uses the permission-free `scim/v2/Me` endpoint, so a
+  live-but-scoped token is no longer mis-reported as dead.
+
 ## [0.1.6] - 2026-06-01
 
 ### Fixed

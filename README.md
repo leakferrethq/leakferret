@@ -110,8 +110,9 @@ leakferret scan .
 leakferret runs findings through a five-station pipeline. Each station only
 sees what it needs, and the raw secret never advances past disk.
 
-1. **Scan** — a fast regex pre-filter over your files. Respects `.gitignore`,
-   reads dotfiles like `.env`, and (with `--git`) walks history.
+1. **Scan** — a fast regex pre-filter over your files, across **60+ secret
+   types**. Respects `.gitignore`, reads dotfiles like `.env`, and (with
+   `--git`) walks history.
 2. **Catalog** — every candidate is checked against a signed database of
    *known-public* example credentials: Stripe test keys,
    `AKIAIOSFODNN7EXAMPLE`, jwt.io samples, RFC examples. Matches are marked
@@ -122,10 +123,11 @@ sees what it needs, and the raw secret never advances past disk.
    dummy-marker heuristics), or asks the host editor or agent's own language
    model — no extra API key, no added cost.
 4. **Verify** — makes a single harmless API call to the provider to confirm a
-   key is **LIVE**. Around 15 providers are covered natively (AWS SigV4,
-   GitHub, GitLab, Stripe, OpenAI, Anthropic, Slack, Twilio, SendGrid,
-   Mailgun, Datadog, Heroku, npm, PyPI, DigitalOcean), with a trufflehog binary
-   fallback for the rest. The call goes straight from your machine to the
+   key is **LIVE**. Around **25 providers** are covered natively (AWS SigV4,
+   GitHub, GitLab, Stripe, OpenAI, Anthropic, Slack, Twilio, SendGrid, Mailgun,
+   Datadog, Heroku, npm, PyPI, DigitalOcean, Hugging Face, Groq, Replicate,
+   Notion, Postman, Figma, Linear, Square, Shopify, Databricks), with a
+   trufflehog binary fallback for the rest. The call goes straight from your machine to the
    provider — leakferret has no servers.
 5. **Rewrite** — swaps a hardcoded literal for an environment-variable lookup
    (`ENV.fetch` / `os.environ` / `process.env`), appends a line to
