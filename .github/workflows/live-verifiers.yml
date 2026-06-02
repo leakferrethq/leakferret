@@ -1,0 +1,46 @@
+name: live-verifiers
+
+# Manual run only. Confirms the provider verifiers against the REAL APIs using
+# throwaway, read-only tokens stored as repo secrets.
+#
+# Add a repository secret named LEAKFERRET_TEST_<PROVIDER>_TOKEN for each
+# provider you want to test (see crates/leakferret-core/tests/live_verifiers.rs
+# for the exact names). The two tenant providers also need a host secret:
+#   - LEAKFERRET_TEST_SHOPIFY_DOMAIN   (e.g. my-store.myshopify.com)
+#   - LEAKFERRET_TEST_DATABRICKS_HOST  (e.g. dbc-xxxx.cloud.databricks.com)
+#
+# Any provider without a secret is SKIPPED. A FAIL means the verifier did not
+# confirm a token we believe is live (wrong endpoint/auth, or a dead token).
+#
+# Use throwaway tokens and revoke them after the run.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run live verifier smoke tests
+        env:
+          LEAKFERRET_TEST_HUGGINGFACE_TOKEN: ${{ secrets.LEAKFERRET_TEST_HUGGINGFACE_TOKEN }}
+          LEAKFERRET_TEST_GROQ_TOKEN: ${{ secrets.LEAKFERRET_TEST_GROQ_TOKEN }}
+          LEAKFERRET_TEST_REPLICATE_TOKEN: ${{ secrets.LEAKFERRET_TEST_REPLICATE_TOKEN }}
+          LEAKFERRET_TEST_NOTION_TOKEN: ${{ secrets.LEAKFERRET_TEST_NOTION_TOKEN }}
+          LEAKFERRET_TEST_POSTMAN_TOKEN: ${{ secrets.LEAKFERRET_TEST_POSTMAN_TOKEN }}
+          LEAKFERRET_TEST_FIGMA_TOKEN: ${{ secrets.LEAKFERRET_TEST_FIGMA_TOKEN }}
+          LEAKFERRET_TEST_LINEAR_TOKEN: ${{ secrets.LEAKFERRET_TEST_LINEAR_TOKEN }}
+          LEAKFERRET_TEST_SQUARE_TOKEN: ${{ secrets.LEAKFERRET_TEST_SQUARE_TOKEN }}
+          LEAKFERRET_TEST_SHOPIFY_TOKEN: ${{ secrets.LEAKFERRET_TEST_SHOPIFY_TOKEN }}
+          LEAKFERRET_TEST_SHOPIFY_DOMAIN: ${{ secrets.LEAKFERRET_TEST_SHOPIFY_DOMAIN }}
+          LEAKFERRET_TEST_DATABRICKS_TOKEN: ${{ secrets.LEAKFERRET_TEST_DATABRICKS_TOKEN }}
+          LEAKFERRET_TEST_DATABRICKS_HOST: ${{ secrets.LEAKFERRET_TEST_DATABRICKS_HOST }}
+        run: |
+          cargo test -p leakferret-core --test live_verifiers -- --nocapture --test-threads=1
