@@ -1,7 +1,10 @@
 //! Databricks token verifier. Tenant-scoped: it needs the workspace host, which
 //! the engine extracts from the finding's context into paired_secrets as
-//! `DATABRICKS_HOST`. `GET https://{host}/api/2.0/clusters/list` with a Bearer
-//! token. Untested live — confirm with a real key.
+//! `DATABRICKS_HOST`. `GET https://{host}/api/2.0/preview/scim/v2/Me` with a
+//! Bearer token — the permission-free "current user" endpoint, so any live
+//! token returns 200 (a scoped token would 403 the clusters API even though it
+//! is live, which would falsely read as dead). Confirmed live against a real
+//! `dapi…` workspace PAT.
 
 use async_trait::async_trait;
 use serde_json::json;
@@ -30,7 +33,7 @@ impl Verifier for DatabricksVerifier {
                 reason: "workspace host (*.databricks.com / *.azuredatabricks.net) not found near the token".into(),
             };
         };
-        let url = format!("https://{host}/api/2.0/clusters/list");
+        let url = format!("https://{host}/api/2.0/preview/scim/v2/Me");
         let resp = ctx
             .http
             .get(&url)
