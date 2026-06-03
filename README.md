@@ -203,9 +203,18 @@ read-only resources expose the engine's catalog as context: `leakferret://secret
 leakferret scan      Regex pre-filter only (no classifier, no verifier)
 leakferret verify    Scan + classify + provider verification
 leakferret rewrite   Scan + classify + propose/apply ENV-fetch rewrites
+leakferret org       Scan every public repo owned by a GitHub user/org
 leakferret baseline  Manage the per-repo fingerprint baseline
 leakferret catalog   Load and inspect the fixture catalog
 leakferret mcp       Start the MCP server on stdio
+```
+
+Scan a whole GitHub account or org in one go (handy for finding leaks across all
+your public repos before someone else does):
+
+```bash
+leakferret org leakferrethq            # all public repos for that owner
+leakferret org myco --token "$GITHUB_TOKEN" --format sarif > leaks.sarif
 ```
 
 Common flags:

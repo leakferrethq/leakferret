@@ -6,6 +6,7 @@ use clap::Subcommand;
 mod baseline;
 mod catalog;
 mod mcp;
+mod org;
 mod progress;
 mod rewrite;
 mod scan;
@@ -19,6 +20,8 @@ pub enum Cmd {
     Verify(verify::Args),
     /// Scan + classify + propose ENV-fetch rewrites for REAL findings.
     Rewrite(rewrite::Args),
+    /// Scan every public repo owned by a GitHub user or organization.
+    Org(org::Args),
     /// Manage the baseline file (`.leakferret-baseline.json`).
     Baseline(baseline::Args),
     /// Manage the fixture catalog (load, refresh, info).
@@ -32,6 +35,7 @@ pub async fn dispatch(cmd: Cmd, quiet: bool, verbose: u8) -> Result<i32> {
         Cmd::Scan(a) => scan::run(a, quiet, verbose).await,
         Cmd::Verify(a) => verify::run(a).await,
         Cmd::Rewrite(a) => rewrite::run(a, verbose).await,
+        Cmd::Org(a) => org::run(a, quiet).await,
         Cmd::Baseline(a) => baseline::run(a).await,
         Cmd::Catalog(a) => catalog::run(a).await,
         Cmd::Mcp(a) => mcp::run(a).await,
