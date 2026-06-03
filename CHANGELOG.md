@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9] - 2026-06-03
+
+### Added
+- `leakferret org <owner>`: scan every public repository owned by a GitHub user
+  or organization in one command. Lists the owner's repos via the GitHub API,
+  shallow-clones each, runs the scan engine, and emits one aggregated report
+  with each finding's path prefixed by `owner/repo/`. Forks and archived repos
+  are skipped by default (`--include-forks`, `--include-archived`); `--token`
+  (or `GITHUB_TOKEN`) raises the API rate limit; `--max-repos` caps the run.
+
 ## [0.1.8] - 2026-06-03
 
 ### Added
