@@ -73,7 +73,9 @@ pub async fn run(args: Args, quiet: bool) -> Result<i32> {
 
     // One work dir per owner under the system temp dir. Cleared up front so a
     // re-run never reuses a stale clone, and removed again at the end.
-    let base = std::env::temp_dir().join("leakferret-org").join(&args.owner);
+    let base = std::env::temp_dir()
+        .join("leakferret-org")
+        .join(&args.owner);
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(&base)
         .with_context(|| format!("creating work directory {}", base.display()))?;
