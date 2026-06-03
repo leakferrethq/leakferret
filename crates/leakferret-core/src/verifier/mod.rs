@@ -238,6 +238,17 @@ impl VerifierRegistry {
             .map_or(&[][..], Vec::as_slice)
     }
 
+    /// Every registered provider name, in registration order, deduped.
+    /// Includes the trufflehog fallback registered last.
+    pub fn providers(&self) -> Vec<&'static str> {
+        let mut seen = std::collections::HashSet::new();
+        self.all
+            .iter()
+            .map(|v| v.provider())
+            .filter(|p| seen.insert(*p))
+            .collect()
+    }
+
     pub fn all(&self) -> &[Arc<dyn Verifier>] {
         &self.all
     }

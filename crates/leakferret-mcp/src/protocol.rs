@@ -101,3 +101,18 @@ pub struct Prompt {
     pub name: &'static str,
     pub description: &'static str,
 }
+
+/// `resources/list` response.
+#[derive(Debug, Serialize)]
+pub struct ResourcesList<'a> {
+    pub resources: &'a [Resource],
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Resource {
+    pub uri: &'static str,
+    pub name: &'static str,
+    pub description: &'static str,
+    pub mime_type: &'static str,
+}
