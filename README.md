@@ -197,6 +197,26 @@ read-only resources expose the engine's catalog as context: `leakferret://secret
 
 ---
 
+## How it compares
+
+|                              | gitleaks | trufflehog | detect-secrets | GitGuardian | leakferret |
+| ---------------------------- | :------: | :--------: | :------------: | :---------: | :--------: |
+| Live provider verification   |    —     |     ✓      |       —        |      ✓      |     ✓      |
+| In-place env-var rewrite      |    —     |     —      |       —        |      —      |     ✓      |
+| MCP server for AI agents      |    —     |     —      |       —        |      —      |     ✓      |
+| Baseline (fail only on new)   |    —     |     —      |       ✓        |      ✓      |     ✓      |
+| SARIF / Code Scanning         |    ✓     |     ✓      |       —        |      ✓      |     ✓      |
+| Free, local, no account       |    ✓     |     ✓      |       ✓        |      —      |     ✓      |
+
+gitleaks is the fastest pre-commit regex blocker. trufflehog set the bar for live
+verification. detect-secrets owns the baseline-a-legacy-repo workflow. GitGuardian is
+the paid platform with the broadest detectors and a dashboard. leakferret does the
+regex pre-filter, verifies which keys are live, rewrites the leak to an env var, and
+runs as an MCP server so coding agents check their own diffs. Full writeup:
+[leakferret.com/compare](https://leakferret.com/compare/).
+
+---
+
 ## CLI reference
 
 ```text
