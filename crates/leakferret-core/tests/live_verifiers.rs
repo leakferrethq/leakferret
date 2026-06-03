@@ -5,7 +5,7 @@
 //! against the real provider API, set the env var to a throwaway read-only
 //! token and run:
 //!
-//!   cargo test -p leakferret-core --test live_verifiers -- --nocapture
+//!   `cargo test -p leakferret-core --test live_verifiers -- --nocapture`
 //!
 //! or trigger the `live-verifiers` GitHub Actions workflow (which maps repo
 //! secrets to these env vars). A `FAIL` means the verifier did not return
