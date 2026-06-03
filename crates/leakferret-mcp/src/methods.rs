@@ -63,7 +63,10 @@ pub const RESOURCES: &[Resource] = &[
 /// Serve a resource body for `resources/read`. Both resources are static,
 /// derived from the built-in registries, and contain no secret material.
 pub fn read_resource(id: Option<Value>, params: Value) -> Response {
-    let uri = params.get("uri").and_then(Value::as_str).unwrap_or_default();
+    let uri = params
+        .get("uri")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     let body = match uri {
         "leakferret://secret-types" => {
             let registry = leakferret_core::patterns::PatternRegistry::builtin();
@@ -87,7 +90,11 @@ pub fn read_resource(id: Option<Value>, params: Value) -> Response {
             serde_json::to_string_pretty(&json!({ "count": count, "providers": providers }))
         }
         other => {
-            return Response::error(id, codes::INVALID_PARAMS, format!("unknown resource: {other}"));
+            return Response::error(
+                id,
+                codes::INVALID_PARAMS,
+                format!("unknown resource: {other}"),
+            );
         }
     };
 
