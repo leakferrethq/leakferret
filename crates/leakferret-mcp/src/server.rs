@@ -7,7 +7,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::io::{Stdin, Stdout};
 
 use crate::methods;
-use crate::protocol::{codes, PromptsList, Response, ToolsList, PROTOCOL_VERSION};
+use crate::protocol::{codes, PromptsList, ResourcesList, Response, ToolsList, PROTOCOL_VERSION};
 
 /// MCP server bound to a stdio pair. The default is stdin/stdout
 /// (per the MCP spec); the constructors are split out for tests.
@@ -87,8 +87,16 @@ async fn handle(req: crate::protocol::Request) -> Response {
             })
             .unwrap_or(Value::Null),
         ),
+        "resources/list" => Response::ok(
+            id,
+            serde_json::to_value(ResourcesList {
+                resources: methods::RESOURCES,
+            })
+            .unwrap_or(Value::Null),
+        ),
         "tools/call" => methods::call_tool(id, req.params).await,
         "prompts/get" => methods::get_prompt(id, req.params),
+        "resources/read" => methods::read_resource(id, req.params),
         m => Response::error(
             id,
             codes::METHOD_NOT_FOUND,
@@ -103,8 +111,9 @@ fn initialize(id: Option<Value>) -> Response {
         json!({
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {
-                "tools":   { "listChanged": false },
-                "prompts": { "listChanged": false },
+                "tools":     { "listChanged": false },
+                "prompts":   { "listChanged": false },
+                "resources": { "subscribe": false, "listChanged": false },
             },
             "serverInfo": {
                 "name":    "leakferret",
@@ -135,5 +144,33 @@ mod tests {
         wread.read_to_string(&mut out).await.unwrap();
         assert!(out.contains("\"protocolVersion\""));
         assert!(out.contains("\"leakferret\""));
+        assert!(out.contains("\"resources\""));
+    }
+
+    #[tokio::test]
+    async fn resources_list_and_read() {
+        let mut input = Vec::new();
+        input.extend_from_slice(br#"{"jsonrpc":"2.0","id":1,"method":"resources/list"}"#);
+        input.push(b'\n');
+        input.extend_from_slice(
+            br#"{"jsonrpc":"2.0","id":2,"method":"resources/read","params":{"uri":"leakferret://verifiers"}}"#,
+        );
+        input.push(b'\n');
+
+        let (mut wread, wwrite) = tokio::io::duplex(65536);
+        let (rread, mut rwrite) = tokio::io::duplex(65536);
+        rwrite.write_all(&input).await.unwrap();
+        drop(rwrite);
+
+        Server::new(rread, wwrite).run().await.unwrap();
+
+        let mut out = String::new();
+        wread.read_to_string(&mut out).await.unwrap();
+        // resources/list advertises both static resources.
+        assert!(out.contains("leakferret://secret-types"));
+        assert!(out.contains("leakferret://verifiers"));
+        // resources/read returns the provider list as a JSON text body.
+        assert!(out.contains("providers"));
+        assert!(out.contains("github"));
     }
 }

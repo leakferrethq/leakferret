@@ -10,7 +10,7 @@ use leakferret_core::{
     Engine, EngineConfig, Finding, Rewriter,
 };
 
-use crate::protocol::{codes, Prompt, Response, Tool};
+use crate::protocol::{codes, Prompt, Resource, Response, Tool};
 
 pub const TOOLS: &[Tool] = &[
     Tool {
@@ -44,6 +44,74 @@ pub const PROMPTS: &[Prompt] = &[Prompt {
     name: "classify",
     description: "System prompt for classifying candidate secrets as REAL / FIXTURE / UNKNOWN.",
 }];
+
+pub const RESOURCES: &[Resource] = &[
+    Resource {
+        uri: "leakferret://secret-types",
+        name: "Detectable secret types",
+        description: "Every secret pattern leakferret can detect, with its id, human description, and default severity.",
+        mime_type: "application/json",
+    },
+    Resource {
+        uri: "leakferret://verifiers",
+        name: "Live-verification providers",
+        description: "Providers leakferret can confirm a key against with a single live API call, plus the trufflehog fallback.",
+        mime_type: "application/json",
+    },
+];
+
+/// Serve a resource body for `resources/read`. Both resources are static,
+/// derived from the built-in registries, and contain no secret material.
+pub fn read_resource(id: Option<Value>, params: Value) -> Response {
+    let uri = params
+        .get("uri")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let body = match uri {
+        "leakferret://secret-types" => {
+            let registry = leakferret_core::patterns::PatternRegistry::builtin();
+            let types: Vec<Value> = registry
+                .iter()
+                .map(|p| {
+                    json!({
+                        "id": p.id,
+                        "description": p.description,
+                        "severity": p.severity,
+                    })
+                })
+                .collect();
+            let count = types.len();
+            serde_json::to_string_pretty(&json!({ "count": count, "secret_types": types }))
+        }
+        "leakferret://verifiers" => {
+            let registry = leakferret_core::verifier::VerifierRegistry::builtin();
+            let providers = registry.providers();
+            let count = providers.len();
+            serde_json::to_string_pretty(&json!({ "count": count, "providers": providers }))
+        }
+        other => {
+            return Response::error(
+                id,
+                codes::INVALID_PARAMS,
+                format!("unknown resource: {other}"),
+            );
+        }
+    };
+
+    match body {
+        Ok(text) => Response::ok(
+            id,
+            json!({
+                "contents": [{
+                    "uri": uri,
+                    "mimeType": "application/json",
+                    "text": text,
+                }],
+            }),
+        ),
+        Err(e) => Response::error(id, codes::INTERNAL, format!("{e:#}")),
+    }
+}
 
 pub async fn call_tool(id: Option<Value>, params: Value) -> Response {
     let name = params

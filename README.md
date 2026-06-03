@@ -191,7 +191,9 @@ as `io.github.leakferrethq/leakferret`, so registry-aware clients can discover i
 
 Tools exposed: `scan_repository`, `classify_candidates`, `verify_finding`,
 `propose_rewrite`, and `baseline_diff`. A `classify` prompt is also provided so
-an agent can classify candidates inline using the model it already has.
+an agent can classify candidates inline using the model it already has. Two
+read-only resources expose the engine's catalog as context: `leakferret://secret-types`
+(every detectable pattern) and `leakferret://verifiers` (the live-verification providers).
 
 ---
 
